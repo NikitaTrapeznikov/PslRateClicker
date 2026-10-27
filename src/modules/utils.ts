@@ -292,25 +292,11 @@ export function installYandexGamesPlatformGuards(): () => void {
     soundEngine.setSystemPaused(document.hidden);
   };
 
-  const handleWindowBlur = () => {
-    soundEngine.setSystemPaused(true);
-  };
-
-  const handleWindowFocus = () => {
-    if (!document.hidden) {
-      soundEngine.setSystemPaused(false);
-    }
-  };
-
   window.addEventListener('contextmenu', handleContextMenu);
   document.addEventListener('visibilitychange', handleVisibilityChange);
-  window.addEventListener('blur', handleWindowBlur);
-  window.addEventListener('focus', handleWindowFocus);
 
   return () => {
     window.removeEventListener('contextmenu', handleContextMenu);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
-    window.removeEventListener('blur', handleWindowBlur);
-    window.removeEventListener('focus', handleWindowFocus);
   };
 }

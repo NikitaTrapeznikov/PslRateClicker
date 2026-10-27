@@ -76,10 +76,16 @@ export const LooksmaxMusicPlayer: React.FC = () => {
   const activeDancerIdx = dancerIndex % LOOKSMAX_DANCERS.length;
   const activeDancer = LOOKSMAX_DANCERS[activeDancerIdx];
 
-  // Свернутая мини-версия плеера с мгновенно переключаемыми зацикленными GIF (320x420 px)
+  // Свернутая мини-версия плеера с мгновенно переключаемыми зацикленными GIF (320x420 px) по клику на саму плашку
   if (isMinimized) {
     return (
-      <div className="relative w-full max-w-[320px] mx-auto aspect-[320/420] rounded-xl border border-[#2A343D] bg-[#0F1419] overflow-hidden flex flex-col justify-between shadow-lg">
+      <div
+        onClick={() =>
+          setDancerIndex((prev) => (prev + 1) % LOOKSMAX_DANCERS.length)
+        }
+        title="Нажмите на гифку, чтобы сменить танец"
+        className="relative w-full max-w-[320px] mx-auto aspect-[320/420] rounded-xl border border-[#2A343D] bg-[#0F1419] overflow-hidden flex flex-col justify-end shadow-lg cursor-pointer select-none"
+      >
         {/* Все 5 GIF смонтированы одновременно в DOM — переключение индекса меняет только прозрачность за 0 мс без перезагрузки */}
         <div className="absolute inset-0 w-full h-full select-none pointer-events-none">
           {LOOKSMAX_DANCERS.map((dancer, idx) => (
@@ -98,33 +104,20 @@ export const LooksmaxMusicPlayer: React.FC = () => {
           ))}
         </div>
 
-        {/* Легкое затемнение сверху и снизу для контраста интерфейса поверх оригинального видеофона */}
+        {/* Легкое затемнение снизу для контраста мини-плеера поверх оригинального видеофона */}
         <div
           className="absolute inset-0 z-10 pointer-events-none"
           style={{
             background:
-              'linear-gradient(180deg, rgba(15,20,25,0.65) 0%, rgba(15,20,25,0.08) 38%, rgba(15,20,25,0.78) 100%)',
+              'linear-gradient(180deg, rgba(15,20,25,0.05) 0%, rgba(15,20,25,0.12) 55%, rgba(15,20,25,0.78) 100%)',
           }}
         />
 
-        {/* Верхняя плашка мгновенного переключения танца */}
-        <div className="relative z-20 p-2.5 flex items-center justify-between gap-2">
-          <span className="px-2.5 py-1 rounded-lg bg-[#0F1419]/85 backdrop-blur-md border border-[#2A343D] text-[11px] font-mono text-emerald-400 truncate">
-            {activeDancer.name} · 320×420
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              setDancerIndex((prev) => (prev + 1) % LOOKSMAX_DANCERS.length)
-            }
-            className="px-2.5 py-1 rounded-lg bg-[#0F1419]/90 hover:bg-[#222C34] backdrop-blur-md border border-[#2A343D] text-[11px] font-medium text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Танец {activeDancerIdx + 1}/{LOOKSMAX_DANCERS.length}
-          </button>
-        </div>
-
         {/* Свернутый мини-плеер поверх оригинальной GIF луксмаксера */}
-        <div className="relative z-20 m-2.5 p-3.5 rounded-xl border border-[#2A343D] bg-[#182026]/88 backdrop-blur-md space-y-2.5 shadow-xl">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="relative z-20 m-2.5 p-3.5 rounded-xl border border-[#2A343D] bg-[#182026]/88 backdrop-blur-md space-y-2.5 shadow-xl cursor-default"
+        >
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-mono text-emerald-400 truncate">

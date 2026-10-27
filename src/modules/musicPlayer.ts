@@ -1,7 +1,13 @@
 /**
  * Полноформатный двухдековый MP3-аудиоплеер (Deck A + Deck B) с плавным переходом (Crossfade)
- * для 16 полных мемных треков луксмаксинга, раздаваемых напрямую с локального сервера приложения
- * (/assets/music/track_01.mp3 .. track_16.mp3) без блокировок внешних доменов.
+ * для 16 полных мемных треков луксмаксинга.
+ *
+ * Архитектура хранения и воспроизведения:
+ * 1. Все 16 MP3-файлов уже скачаны в проект (/public/assets/music/track_01.mp3 .. track_16.mp3).
+ * 2. В браузере каждый трек кэшируется в оперативной памяти (RAM Blob URL Cache), поэтому
+ *    он не скачивается заново при переключениях или повторах и не зависит от внешних сайтов.
+ * 3. Стартовая громкость установлена на 10% (0.1), музыка играет непрерывно, пока ее
+ *    не поставят на паузу вручную или не свернут вкладку браузера.
  */
 
 export interface LooksmaxTrack {
@@ -16,14 +22,22 @@ export interface LooksmaxTrack {
 
 export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
   {
+    id: 'revolver_dj_zup_raiii',
+    title: 'револьвер (Оригинал SoundCloud)',
+    artist: 'DJ ZUP RAlii (sadcircus)',
+    memeTag: 'Что ты можешь сказать, например?',
+    durationHint: '1:13',
+    streamUrl: '/assets/music/revolver_original_sc.mp3',
+    fallbackUrl: '/assets/music/revolver_original_sc.mp3',
+  },
+  {
     id: 'sleepwalker_x_icewhore',
     title: 'Sleepwalker × ICEWHORE! (Slowed Extended)',
     artist: 'akiaura × Lumi Athena',
     memeTag: 'Главный гимн мьюинга (Полный микс)',
     durationHint: '4:00',
     streamUrl: '/assets/music/track_01.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/81/6c/00/816c006f-801a-e5d3-38fb-ed3f80769962/mzaf_4780956237814330381.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_01.mp3',
   },
   {
     id: 'eeyuh_x_fluxxwave',
@@ -32,8 +46,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Эдиты с Jordan Barrett и Chico',
     durationHint: '1:55',
     streamUrl: '/assets/music/track_02.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/7b/d1/bd/7bd1bd96-8684-cf91-f820-ec822031b9f0/mzaf_15607841787987664513.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_02.mp3',
   },
   {
     id: 'ecstacy_slowed_perfection',
@@ -42,8 +55,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Классика TikTok Looksmax',
     durationHint: '3:54',
     streamUrl: '/assets/music/track_03.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/47/69/4a/47694ae9-c171-9947-8db4-ee24de07b4dd/mzaf_2889285358440161229.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_03.mp3',
   },
   {
     id: 'sleepwalker_full_slowed',
@@ -52,8 +64,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Ночной бонсмэшинг',
     durationHint: '4:00',
     streamUrl: '/assets/music/track_04.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/46/2e/c2/462ec2c5-4be2-bf1e-7f54-3c17f5099012/mzaf_1669857085612465611.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_04.mp3',
   },
   {
     id: 'lost_soul_down_slowed',
@@ -62,8 +73,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Холодный взгляд Hunter Eyes',
     durationHint: '2:44',
     streamUrl: '/assets/music/track_05.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/97/ea/04/97ea047f-4d90-c1d3-fc0f-4b266553a113/mzaf_8478242493993484447.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_05.mp3',
   },
   {
     id: 'memory_reboot_full',
@@ -72,8 +82,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Восхождение до True Adam',
     durationHint: '3:56',
     streamUrl: '/assets/music/track_06.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/6d/98/20/6d9820e4-4453-20c4-3706-8407511183cc/mzaf_17555219195355900917.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_06.mp3',
   },
   {
     id: 'metamorphosis_interworld_full',
@@ -82,8 +91,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Гониальный угол 120°',
     durationHint: '2:22',
     streamUrl: '/assets/music/track_07.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/bd/b8/28/bdb828dd-850d-cc23-d505-eb732924a31d/mzaf_11930869156490308194.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_07.mp3',
   },
   {
     id: 'close_eyes_dvrst_full',
@@ -92,8 +100,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Аура Chadlite',
     durationHint: '2:12',
     streamUrl: '/assets/music/track_08.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview126/v4/4d/69/89/4d69898f-b8df-9ca0-5dbc-3b34e85fe7f2/mzaf_16602414006798813893.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_08.mp3',
   },
   {
     id: 'sahara_hensonn_full',
@@ -102,8 +109,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Выдвинутая максилла',
     durationHint: '3:16',
     streamUrl: '/assets/music/track_09.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview112/v4/5a/e7/a7/5ae7a76f-7460-bb18-bfab-02bb6c90020b/mzaf_15685735625886950974.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_09.mp3',
   },
   {
     id: 'murder_in_my_mind_extended',
@@ -112,8 +118,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Сушка в зале до 10% жира',
     durationHint: '4:00',
     streamUrl: '/assets/music/track_10.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/d2/5e/58/d25e5802-25f7-bd23-109e-5fd9a2ac5d1d/mzaf_3262384288922300118.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_10.mp3',
   },
   {
     id: 'after_dark_mrkitty_full',
@@ -122,8 +127,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Вечерний курс ретинола 0.1%',
     durationHint: '4:00',
     streamUrl: '/assets/music/track_11.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/3e/cb/52/3ecb5294-5ea1-e392-7262-1b10cc67a299/mzaf_17548677748266742699.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_11.mp3',
   },
   {
     id: 'the_perfect_girl_mareux_full',
@@ -132,17 +136,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Симметрия золотого сечения',
     durationHint: '3:14',
     streamUrl: '/assets/music/track_12.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/43/4a/de/434ade34-6dd1-0346-57c8-89e793506ffa/mzaf_2755628340755959823.plus.aac.p.m4a',
-  },
-  {
-    id: 'sudno_molchat_doma',
-    title: 'Судно (Sudno · Doomer to Chad Arc)',
-    artist: 'Молчат Дома',
-    memeTag: 'Старт пути с Sub 3',
-    durationHint: '2:25',
-    streamUrl: '/assets/music/track_13.mp3',
-    fallbackUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    fallbackUrl: '/assets/music/track_12.mp3',
   },
   {
     id: 'streets_silhouette_mog',
@@ -151,7 +145,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Плавный переход скул',
     durationHint: '4:00',
     streamUrl: '/assets/music/track_14.mp3',
-    fallbackUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    fallbackUrl: '/assets/music/track_14.mp3',
   },
   {
     id: 'montagem_batchi_phonk',
@@ -160,7 +154,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Агрессивный бонсмэшинг молотком',
     durationHint: '1:26',
     streamUrl: '/assets/music/track_15.mp3',
-    fallbackUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+    fallbackUrl: '/assets/music/track_15.mp3',
   },
   {
     id: 'crystal_castles_kerosene_mix',
@@ -169,8 +163,7 @@ export const LOOKSMAX_PLAYLIST: LooksmaxTrack[] = [
     memeTag: 'Зимняя арка (Winter Arc)',
     durationHint: '4:00',
     streamUrl: '/assets/music/track_16.mp3',
-    fallbackUrl:
-      'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/55/2b/c6/552bc64b-dc54-46e1-2874-32e7bce2ba78/mzaf_4776738312820021495.plus.aac.p.m4a',
+    fallbackUrl: '/assets/music/track_16.mp3',
   },
 ];
 
@@ -182,12 +175,14 @@ class DualDeckCrossfadeController {
   private deckB: HTMLAudioElement | null = null;
   private activeSlot: 'A' | 'B' = 'A';
 
-  private isPlaying = false;
+  private isPlaying = true;
+  private userExplicitlyPaused = false;
   private systemPaused = false;
   private isLoading = false;
   private isCrossfading = false;
 
-  private masterVolume = 0.55;
+  // Стартовая громкость ровно 10% (0.1) по запросу пользователя
+  private masterVolume = 0.1;
   private deckAVolumeFactor = 1.0;
   private deckBVolumeFactor = 0.0;
 
@@ -201,13 +196,105 @@ class DualDeckCrossfadeController {
   private autoCrossfadeTriggered = false;
   private listeners: Set<() => void> = new Set();
 
+  // Кэш уже загруженных локальных MP3-файлов в оперативной памяти (blob: URL)
+  private blobUrlCache: Map<string, string> = new Map();
+  private pendingFetches: Map<string, Promise<string>> = new Map();
+
   constructor() {
     if (typeof window !== 'undefined') {
       this.deckA = this.createDeckElement('A');
       this.deckB = this.createDeckElement('B');
-      this.prepareDeck(this.deckA, 0);
       this.syncPhysicalVolumes();
+      this.prepareDeck(this.deckA, 0);
+      this.preloadTrackIntoMemory(1);
+      this.initContinuousPlayback();
     }
+  }
+
+  /**
+   * Загружает локальный файл из /assets/music/ один раз в Blob URL в памяти браузера,
+   * чтобы исключить повторное скачивание и проблемы с HTTP Range запросами.
+   */
+  private getOrLoadBlobUrl(streamUrl: string): Promise<string> {
+    const cached = this.blobUrlCache.get(streamUrl);
+    if (cached) return Promise.resolve(cached);
+
+    const existingPromise = this.pendingFetches.get(streamUrl);
+    if (existingPromise) return existingPromise;
+
+    const promise = fetch(streamUrl, { cache: 'force-cache' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        const objectUrl = URL.createObjectURL(blob);
+        this.blobUrlCache.set(streamUrl, objectUrl);
+        this.pendingFetches.delete(streamUrl);
+        return objectUrl;
+      })
+      .catch(() => {
+        this.pendingFetches.delete(streamUrl);
+        return streamUrl;
+      });
+
+    this.pendingFetches.set(streamUrl, promise);
+    return promise;
+  }
+
+  private preloadTrackIntoMemory(trackIndex: number): void {
+    const normalizedIdx =
+      ((trackIndex % LOOKSMAX_PLAYLIST.length) + LOOKSMAX_PLAYLIST.length) %
+      LOOKSMAX_PLAYLIST.length;
+    const track = LOOKSMAX_PLAYLIST[normalizedIdx];
+    this.getOrLoadBlobUrl(track.streamUrl).catch(() => {});
+  }
+
+  /**
+   * Гарантирует, что музыка всегда играет с самого старта (пока пользователь сам не нажмет «Пауза»
+   * или не свернет вкладку браузера).
+   */
+  private initContinuousPlayback(): void {
+    const ensurePlaying = () => {
+      if (this.userExplicitlyPaused || this.systemPaused || this.isCrossfading) {
+        return;
+      }
+      const active = this.getActiveDeck();
+      if (!active) return;
+
+      if (!active.src) {
+        this.prepareDeck(active, this.currentTrackIndex);
+      }
+      if (active.paused) {
+        this.syncPhysicalVolumes();
+        this.applyPlaybackRateToDeck(active);
+        active
+          .play()
+          .then(() => {
+            this.isPlaying = true;
+            this.notify();
+          })
+          .catch(() => {
+            // Браузер может ждать первого клика по странице после открытия вкладки
+          });
+      }
+    };
+
+    // Любое действие пользователя на странице разблокирует Web Audio / HTML5 Audio, если автоплей был отложен браузером
+    const onUserInteraction = () => {
+      ensurePlaying();
+    };
+
+    window.addEventListener('pointerdown', onUserInteraction, { capture: true, passive: true });
+    window.addEventListener('keydown', onUserInteraction, { capture: true, passive: true });
+    window.addEventListener('click', onUserInteraction, { capture: true, passive: true });
+
+    // Сторожевой таймер: если музыка не поставлена на паузу пользователем и вкладка открыта — держим воспроизведение активным
+    window.setInterval(() => {
+      ensurePlaying();
+    }, 1200);
+
+    setTimeout(ensurePlaying, 100);
   }
 
   private createDeckElement(slot: 'A' | 'B'): HTMLAudioElement {
@@ -222,7 +309,7 @@ class DualDeckCrossfadeController {
       }
 
       if (
-        this.isPlaying &&
+        !this.userExplicitlyPaused &&
         !this.systemPaused &&
         !this.isCrossfading &&
         !this.autoCrossfadeTriggered &&
@@ -250,6 +337,9 @@ class DualDeckCrossfadeController {
     el.addEventListener('canplay', () => {
       if (this.activeSlot !== slot) return;
       this.isLoading = false;
+      if (!this.userExplicitlyPaused && !this.systemPaused && el.paused) {
+        el.play().catch(() => {});
+      }
       this.notify();
     });
 
@@ -274,21 +364,6 @@ class DualDeckCrossfadeController {
       }
     });
 
-    el.addEventListener('error', () => {
-      if (this.activeSlot !== slot) return;
-      const track = this.getCurrentTrack();
-      if (!el.src.includes('itunes.apple.com') && !el.src.includes('soundhelix.com')) {
-        el.src = track.fallbackUrl;
-        el.load();
-        if (this.isPlaying && !this.systemPaused) {
-          el.play().catch(() => {});
-        }
-      } else {
-        this.isLoading = false;
-        this.notify();
-      }
-    });
-
     return el;
   }
 
@@ -306,9 +381,22 @@ class DualDeckCrossfadeController {
       ((trackIndex % LOOKSMAX_PLAYLIST.length) + LOOKSMAX_PLAYLIST.length) %
       LOOKSMAX_PLAYLIST.length;
     const track = LOOKSMAX_PLAYLIST[normalizedIdx];
-    deck.src = track.streamUrl;
-    deck.load();
-    this.applyPlaybackRateToDeck(deck);
+
+    const cachedBlobUrl = this.blobUrlCache.get(track.streamUrl);
+    if (cachedBlobUrl) {
+      deck.src = cachedBlobUrl;
+      deck.load();
+      this.applyPlaybackRateToDeck(deck);
+    } else {
+      // Ставим прямой локальный путь сразу, а параллельно кэшируем в Blob-память для следующих проигрываний
+      deck.src = track.streamUrl;
+      deck.load();
+      this.applyPlaybackRateToDeck(deck);
+      this.getOrLoadBlobUrl(track.streamUrl).catch(() => {});
+    }
+
+    // Предзагружаем следующий трек в память заранее
+    this.preloadTrackIntoMemory(normalizedIdx + 1);
   }
 
   private applyPlaybackRateToDeck(deck: HTMLAudioElement | null): void {
@@ -341,6 +429,7 @@ class DualDeckCrossfadeController {
   }
 
   private crossfadeToTrack(nextTrackIndex: number, fadeDurationSec: number): void {
+    this.systemPaused = false;
     const normalizedIdx =
       ((nextTrackIndex % LOOKSMAX_PLAYLIST.length) + LOOKSMAX_PLAYLIST.length) %
       LOOKSMAX_PLAYLIST.length;
@@ -364,7 +453,7 @@ class DualDeckCrossfadeController {
 
     this.prepareDeck(incomingDeck, normalizedIdx);
 
-    if (!this.isPlaying || this.systemPaused) {
+    if (this.userExplicitlyPaused) {
       if (outgoingDeck) outgoingDeck.pause();
       this.deckAVolumeFactor = incomingSlot === 'A' ? 1 : 0;
       this.deckBVolumeFactor = incomingSlot === 'B' ? 1 : 0;
@@ -377,25 +466,16 @@ class DualDeckCrossfadeController {
 
     this.isCrossfading = true;
     if (incomingSlot === 'A') {
-      this.deckAVolumeFactor = 0.15;
-      this.deckBVolumeFactor = 0.85;
+      this.deckAVolumeFactor = 0.2;
+      this.deckBVolumeFactor = 0.8;
     } else {
-      this.deckBVolumeFactor = 0.15;
-      this.deckAVolumeFactor = 0.85;
+      this.deckBVolumeFactor = 0.2;
+      this.deckAVolumeFactor = 0.8;
     }
     this.syncPhysicalVolumes();
 
     if (incomingDeck) {
-      const playPromise = incomingDeck.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          if (err?.name === 'NotAllowedError') {
-            this.isPlaying = false;
-            this.isCrossfading = false;
-            this.notify();
-          }
-        });
-      }
+      incomingDeck.play().catch(() => {});
     }
 
     const stepMs = 50;
@@ -449,7 +529,7 @@ class DualDeckCrossfadeController {
   }
 
   public getIsPlaying(): boolean {
-    return this.isPlaying && !this.systemPaused;
+    return !this.userExplicitlyPaused && !this.systemPaused && this.isPlaying;
   }
 
   public getIsLoading(): boolean {
@@ -481,12 +561,14 @@ class DualDeckCrossfadeController {
   }
 
   public setVolume(val: number): void {
+    this.systemPaused = false;
     this.masterVolume = Math.max(0, Math.min(1, val));
     this.syncPhysicalVolumes();
     this.notify();
   }
 
   public seekTo(seconds: number): void {
+    this.systemPaused = false;
     const active = this.getActiveDeck();
     if (!active || !Number.isFinite(active.duration)) return;
     const clamped = Math.max(0, Math.min(active.duration, seconds));
@@ -511,10 +593,13 @@ class DualDeckCrossfadeController {
   }
 
   public selectTrack(index: number, autoPlay = true): void {
-    if (autoPlay && !this.isPlaying) {
+    this.systemPaused = false;
+    if (autoPlay) {
+      this.userExplicitlyPaused = false;
       this.isPlaying = true;
     }
-    if (index === this.currentTrackIndex && this.isPlaying) {
+    const active = this.getActiveDeck();
+    if (index === this.currentTrackIndex && active && !active.paused) {
       this.seekTo(0);
       return;
     }
@@ -522,29 +607,33 @@ class DualDeckCrossfadeController {
   }
 
   public nextTrack(autoPlay = true): void {
-    if (autoPlay && !this.isPlaying) {
+    this.systemPaused = false;
+    if (autoPlay) {
+      this.userExplicitlyPaused = false;
       this.isPlaying = true;
     }
     this.crossfadeToTrack(this.currentTrackIndex + 1, MANUAL_CROSSFADE_SECONDS);
   }
 
   public prevTrack(): void {
+    this.systemPaused = false;
     const active = this.getActiveDeck();
     if (active && active.currentTime > 5) {
       this.seekTo(0);
       return;
     }
-    if (!this.isPlaying) {
-      this.isPlaying = true;
-    }
+    this.userExplicitlyPaused = false;
+    this.isPlaying = true;
     this.crossfadeToTrack(this.currentTrackIndex - 1, MANUAL_CROSSFADE_SECONDS);
   }
 
   public togglePlay(): void {
+    this.systemPaused = false;
     const active = this.getActiveDeck();
     if (!active) return;
 
-    if (this.isPlaying) {
+    if (!this.userExplicitlyPaused) {
+      this.userExplicitlyPaused = true;
       this.isPlaying = false;
       this.deckA?.pause();
       this.deckB?.pause();
@@ -555,6 +644,7 @@ class DualDeckCrossfadeController {
       this.isCrossfading = false;
       this.notify();
     } else {
+      this.userExplicitlyPaused = false;
       this.isPlaying = true;
       this.deckAVolumeFactor = this.activeSlot === 'A' ? 1 : 0;
       this.deckBVolumeFactor = this.activeSlot === 'B' ? 1 : 0;
@@ -564,16 +654,7 @@ class DualDeckCrossfadeController {
         this.prepareDeck(active, this.currentTrackIndex);
       }
       this.applyPlaybackRateToDeck(active);
-
-      const playPromise = active.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          if (err?.name === 'NotAllowedError') {
-            this.isPlaying = false;
-            this.notify();
-          }
-        });
-      }
+      active.play().catch(() => {});
       this.notify();
     }
   }
@@ -583,7 +664,8 @@ class DualDeckCrossfadeController {
     if (paused) {
       this.deckA?.pause();
       this.deckB?.pause();
-    } else if (this.isPlaying) {
+    } else if (!this.userExplicitlyPaused) {
+      this.isPlaying = true;
       const active = this.getActiveDeck();
       active?.play().catch(() => {});
     }

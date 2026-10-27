@@ -662,110 +662,99 @@ export default function App() {
               <LooksmaxMusicPlayer />
             </div>
 
-            {/* ЦЕНТРАЛЬНАЯ КОЛОНКА (Col 4–7): Сцена персонажа, Счетчик очков, Спрайт и Мьюинг-комбо */}
+            {/* ЦЕНТРАЛЬНАЯ КОЛОНКА (Col 4–7): Умное зеркало (Smart Mirror) с минималистичным HUD на поверхности */}
             <div className="lg:col-span-5 flex flex-col gap-4">
-              <div className="p-5 rounded-xl border border-[#2A343D] bg-[#182026] flex-1 flex flex-col justify-between">
-                {/* Верхний блок метрик и текущего ранга */}
-                <div className="space-y-3">
-                  <div className="flex items-baseline justify-between gap-2">
+              <div className="relative rounded-[32px] p-[6px] bg-gradient-to-b from-[#475569] via-[#1E293B] to-[#0F172A] shadow-[0_24px_60px_rgba(0,0,0,0.75),0_0_28px_rgba(56,189,248,0.12)] flex-1 flex flex-col">
+                {/* Внутренняя поверхность зеркала с контурной LED-подсветкой и фацетом */}
+                <div className="relative w-full h-full min-h-[520px] rounded-[26px] overflow-hidden border border-white/40 bg-[#F8FAFC] shadow-[inset_0_0_32px_rgba(255,255,255,0.9),inset_0_0_12px_rgba(56,189,248,0.28)] flex flex-col justify-between select-none">
+                  {/* Интерактивное полотно отражения во всю площадь зеркала */}
+                  <canvas
+                    ref={canvasRef}
+                    onPointerDown={handleStagePointerDown}
+                    className="absolute inset-0 w-full h-full block cursor-pointer touch-none"
+                  />
+
+                  {/* Зеркальные блики, градиент стекла и контурное свечение умного зеркала */}
+                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(226,232,240,0.45)_0%,rgba(255,255,255,0)_38%,rgba(255,255,255,0.32)_52%,rgba(203,213,225,0.25)_100%)]" />
+                  <div className="pointer-events-none absolute inset-2.5 rounded-[20px] border border-slate-900/10 shadow-[inset_0_0_24px_rgba(255,255,255,0.85)]" />
+
+                  {/* Верхняя минималистичная HUD-панель на стекле зеркала */}
+                  <div className="pointer-events-none relative z-10 p-4 sm:p-5 flex items-start justify-between gap-3 bg-gradient-to-b from-slate-950/65 via-slate-950/30 to-transparent">
+                    {/* Слева: Текущая стадия и индекс PSL */}
                     <div>
-                      <div className="text-xs text-[#94A3B8]">
-                        <span>Текущий статус</span>
-                        <span className="mx-1.5">·</span>
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-950/55 backdrop-blur-md border border-white/20 text-[11px] font-mono font-semibold text-sky-300 tracking-wide">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         <span>{stats.currentRank.pslScoreLabel}</span>
                       </div>
-                      <h1 className="text-2xl sm:text-3xl font-bold text-[#F1F5F9] font-display tracking-tight">
-                        {stats.currentRank.title}{' '}
-                        <span className="text-base font-normal text-[#94A3B8]">
-                          · {stats.currentRank.subtitle}
-                        </span>
+                      <h1 className="mt-1 text-xl sm:text-2xl font-bold text-white font-display tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)]">
+                        {stats.currentRank.title}
                       </h1>
                     </div>
-                    <div className="text-right font-mono tabular-nums shrink-0">
-                      <div className="text-xs text-[#94A3B8]">Множитель ранга</div>
-                      <div className="text-sm font-semibold text-emerald-400">
-                        ×{stats.currentRank.rankMultiplier.toFixed(2)}
+
+                    {/* Справа: Баланс PSL и чистый прирост */}
+                    <div className="text-right font-mono tabular-nums px-3 py-1.5 rounded-2xl bg-slate-950/55 backdrop-blur-md border border-white/20 shadow-sm">
+                      <div className="text-xl sm:text-2xl font-bold text-white leading-none tracking-tight">
+                        {formatLooks(profile.looks)}{' '}
+                        <span className="text-xs font-semibold text-emerald-400">PSL</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-end gap-2 text-[11px] text-slate-200">
+                        <span className="text-emerald-300">+{formatLooks(stats.passivePerSecond)}/с</span>
+                        <span className="text-white/30">·</span>
+                        <span>+{formatLooks(stats.clickPower)}/клик</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Главный счетчик очков внешности (Looks) */}
-                  <div className="p-3.5 rounded-xl bg-[#0F1419] border border-[#2A343D] flex items-center justify-between gap-4">
-                    <div>
-                      <div className="text-xs text-[#94A3B8]">Очки внешности (PSL Looks)</div>
-                      <div className="text-2xl sm:text-3xl font-bold text-[#F1F5F9] font-mono tabular-nums tracking-tight mt-0.5">
-                        {formatLooks(profile.looks)}
+                  {/* Нижняя минималистичная HUD-панель на стекле зеркала */}
+                  <div className="pointer-events-none relative z-10 p-4 sm:p-5 bg-gradient-to-t from-slate-950/75 via-slate-950/35 to-transparent">
+                    <div className="px-3.5 py-2.5 rounded-2xl bg-slate-950/60 backdrop-blur-md border border-white/20 space-y-2">
+                      {/* Компактная строка прогресса до следующей стадии + бонус мьюинга */}
+                      <div className="flex items-center justify-between gap-2 text-xs font-mono tabular-nums text-white">
+                        <span className="truncate text-slate-200">
+                          {stats.nextRank ? (
+                            <>
+                              До <span className="text-white font-semibold">{stats.nextRank.title}</span>:{' '}
+                              {formatLooks(
+                                Math.max(0, stats.nextRank.requiredLooks - profile.currentRunTotalLooks)
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-amber-300 font-semibold">МАКСИМУМ · TRUE ADAM</span>
+                          )}
+                        </span>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {mewingCombo > 1 && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-400/20 border border-amber-300/40 text-amber-300 text-[11px] font-semibold">
+                              Мьюинг ×{stats.mewingComboMultiplier.toFixed(2)}
+                            </span>
+                          )}
+                          <span className="text-emerald-300 font-semibold">
+                            {stats.progressToNextRank.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Тонкая LED-полоса прогресса на поверхности зеркала */}
+                      <div className="w-full h-1.5 rounded-full bg-white/15 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-emerald-400 to-sky-400 transition-transform duration-150 origin-left"
+                          style={{
+                            transform: `scaleX(${Math.max(0, Math.min(1, stats.progressToNextRank / 100))})`,
+                          }}
+                        />
+                      </div>
+
+                      {/* Тонкий индикатор тонуса кликов (показывается как светящаяся линия) */}
+                      <div className="w-full h-0.5 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full bg-amber-300 transition-transform duration-100 origin-left"
+                          style={{
+                            transform: `scaleX(${Math.max(0, Math.min(1, mewingCombo / 100))})`,
+                          }}
+                        />
                       </div>
                     </div>
-                    <div className="text-right font-mono tabular-nums space-y-1 text-xs">
-                      <div className="text-emerald-400 font-semibold">
-                        +{formatLooks(stats.passivePerSecond)} / сек
-                      </div>
-                      <div className="text-[#94A3B8]">
-                        +{formatLooks(stats.clickPower)} / клик
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Прогресс-бар до следующего ранга PSL */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-mono tabular-nums">
-                      <span className="text-[#94A3B8]">
-                        {stats.nextRank
-                          ? `До стадии ${stats.nextRank.title}: ${formatLooks(
-                              Math.max(0, stats.nextRank.requiredLooks - profile.currentRunTotalLooks)
-                            )} PSL`
-                          : 'Достигнута финальная стадия: True Adam'}
-                      </span>
-                      <span className="text-[#F1F5F9] font-semibold">
-                        {stats.progressToNextRank.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="w-full h-2.5 rounded-full bg-[#0F1419] overflow-hidden border border-[#2A343D]">
-                      <div
-                        className="h-full bg-emerald-500 transition-transform duration-150 origin-left"
-                        style={{
-                          transform: `scaleX(${Math.max(0, Math.min(1, stats.progressToNextRank / 100))})`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Интерактивный холст рендеринга спрайта из референса */}
-                <div className="my-4 flex flex-col items-center">
-                  <div className="relative w-full max-w-[340px] aspect-square rounded-xl overflow-hidden border-2 border-[#2A343D] bg-white shadow-sm">
-                    <canvas
-                      ref={canvasRef}
-                      onPointerDown={handleStagePointerDown}
-                      className="w-full h-full block cursor-pointer touch-none"
-                    />
-                  </div>
-                  <p className="text-xs text-[#94A3B8] text-center mt-2.5">
-                    Нажимайте на портрет для активного мьюинга и импульсов молотка по скулам
-                  </p>
-                </div>
-
-                {/* Нижний индикатор ритма мьюинга и анатомических заметок */}
-                <div className="space-y-2.5 pt-3 border-t border-[#2A343D]">
-                  <div className="flex items-center justify-between text-xs font-mono tabular-nums">
-                    <span className="text-[#94A3B8]">
-                      Тонус мьюинга (Ритм кликов): {Math.round(mewingCombo)}%
-                    </span>
-                    <span className="text-emerald-400 font-semibold">
-                      Бонус ×{stats.mewingComboMultiplier.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-[#0F1419] overflow-hidden">
-                    <div
-                      className="h-full bg-amber-400 transition-transform duration-100 origin-left"
-                      style={{
-                        transform: `scaleX(${Math.max(0, Math.min(1, mewingCombo / 100))})`,
-                      }}
-                    />
-                  </div>
-                  <div className="text-[11px] text-[#94A3B8] truncate">
-                    {stats.currentRank.anatomicalNotes}
                   </div>
                 </div>
               </div>
