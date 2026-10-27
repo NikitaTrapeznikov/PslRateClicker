@@ -1,0 +1,6 @@
+{
+  "name": "PSL Ascension: Эволюция Внешности",
+  "description": "Инкрементальная игра-кликер для Яндекс Игр о прокачке внешности по шкале PSL от Sub 3 до True Adam с системой смены поколений, бонсмэшингом и 24-часовым балансом.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
