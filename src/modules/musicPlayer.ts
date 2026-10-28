@@ -175,7 +175,8 @@ class DualDeckCrossfadeController {
   private deckB: HTMLAudioElement | null = null;
   private activeSlot: 'A' | 'B' = 'A';
 
-  private isPlaying = true;
+  private isMainScreenActive = false;
+  private isPlaying = false;
   private userExplicitlyPaused = false;
   private systemPaused = false;
   private isLoading = false;
@@ -193,6 +194,8 @@ class DualDeckCrossfadeController {
   private duration = 0;
 
   private fadeIntervalId: number | null = null;
+  private watchdogIntervalId: number | null = null;
+  private isUnloading = false;
   private autoCrossfadeTriggered = false;
   private listeners: Set<() => void> = new Set();
 
@@ -208,6 +211,11 @@ class DualDeckCrossfadeController {
       this.prepareDeck(this.deckA, 0);
       this.preloadTrackIntoMemory(1);
       this.initContinuousPlayback();
+
+      const handleUnload = () => this.shutdown();
+      window.addEventListener('beforeunload', handleUnload);
+      window.addEventListener('pagehide', handleUnload);
+      window.addEventListener('unload', handleUnload);
     }
   }
 
@@ -251,15 +259,27 @@ class DualDeckCrossfadeController {
   }
 
   /**
-   * Гарантирует, что музыка всегда играет с самого старта (пока пользователь сам не нажмет «Пауза»
-   * или не свернет вкладку браузера).
+   * Гарантирует, что музыка играет ТОЛЬКО когда активно главное окно приложения (4 основные вкладки),
+   * и полностью молчит на этапе загрузки или вне главного экрана.
    */
   private initContinuousPlayback(): void {
     const ensurePlaying = () => {
+      if (!this.isMainScreenActive || this.isUnloading) {
+        if (this.deckA && !this.deckA.paused) this.deckA.pause();
+        if (this.deckB && !this.deckB.paused) this.deckB.pause();
+        this.isPlaying = false;
+        return;
+      }
+
       if (this.userExplicitlyPaused || this.systemPaused || this.isCrossfading) {
         return;
       }
+
       const active = this.getActiveDeck();
+      const inactive = this.getInactiveDeck();
+      if (inactive && !inactive.paused) {
+        inactive.pause();
+      }
       if (!active) return;
 
       if (!active.src) {
@@ -271,17 +291,22 @@ class DualDeckCrossfadeController {
         active
           .play()
           .then(() => {
+            if (!this.isMainScreenActive || this.isUnloading) {
+              active.pause();
+              this.isPlaying = false;
+              return;
+            }
             this.isPlaying = true;
             this.notify();
           })
           .catch(() => {
-            // Браузер может ждать первого клика по странице после открытия вкладки
+            // Браузер может ждать первого клика по странице
           });
       }
     };
 
-    // Любое действие пользователя на странице разблокирует Web Audio / HTML5 Audio, если автоплей был отложен браузером
     const onUserInteraction = () => {
+      if (!this.isMainScreenActive) return;
       ensurePlaying();
     };
 
@@ -289,12 +314,9 @@ class DualDeckCrossfadeController {
     window.addEventListener('keydown', onUserInteraction, { capture: true, passive: true });
     window.addEventListener('click', onUserInteraction, { capture: true, passive: true });
 
-    // Сторожевой таймер: если музыка не поставлена на паузу пользователем и вкладка открыта — держим воспроизведение активным
-    window.setInterval(() => {
+    this.watchdogIntervalId = window.setInterval(() => {
       ensurePlaying();
-    }, 1200);
-
-    setTimeout(ensurePlaying, 100);
+    }, 1000);
   }
 
   private createDeckElement(slot: 'A' | 'B'): HTMLAudioElement {
@@ -303,12 +325,17 @@ class DualDeckCrossfadeController {
 
     el.addEventListener('timeupdate', () => {
       if (this.activeSlot !== slot) return;
+      if (!this.isMainScreenActive || this.isUnloading) {
+        if (!el.paused) el.pause();
+        return;
+      }
       this.currentTime = el.currentTime || 0;
       if (Number.isFinite(el.duration) && el.duration > 0) {
         this.duration = el.duration;
       }
 
       if (
+        this.isMainScreenActive &&
         !this.userExplicitlyPaused &&
         !this.systemPaused &&
         !this.isCrossfading &&
@@ -335,15 +362,31 @@ class DualDeckCrossfadeController {
     });
 
     el.addEventListener('canplay', () => {
-      if (this.activeSlot !== slot) return;
+      if (this.activeSlot !== slot || this.isUnloading) return;
       this.isLoading = false;
-      if (!this.userExplicitlyPaused && !this.systemPaused && el.paused) {
+      if (
+        this.isMainScreenActive &&
+        !this.userExplicitlyPaused &&
+        !this.systemPaused &&
+        el.paused
+      ) {
         el.play().catch(() => {});
       }
       this.notify();
     });
 
     el.addEventListener('playing', () => {
+      if (
+        !this.isMainScreenActive ||
+        this.isUnloading ||
+        this.systemPaused ||
+        this.userExplicitlyPaused
+      ) {
+        el.pause();
+        this.isPlaying = false;
+        this.notify();
+        return;
+      }
       if (this.activeSlot !== slot) return;
       this.isLoading = false;
       this.isPlaying = true;
@@ -529,7 +572,12 @@ class DualDeckCrossfadeController {
   }
 
   public getIsPlaying(): boolean {
-    return !this.userExplicitlyPaused && !this.systemPaused && this.isPlaying;
+    return (
+      this.isMainScreenActive &&
+      !this.userExplicitlyPaused &&
+      !this.systemPaused &&
+      this.isPlaying
+    );
   }
 
   public getIsLoading(): boolean {
@@ -661,14 +709,150 @@ class DualDeckCrossfadeController {
 
   public setSystemPaused(paused: boolean): void {
     this.systemPaused = paused;
-    if (paused) {
+    if (paused || !this.isMainScreenActive) {
       this.deckA?.pause();
       this.deckB?.pause();
-    } else if (!this.userExplicitlyPaused) {
+    } else if (this.isMainScreenActive && !this.userExplicitlyPaused) {
       this.isPlaying = true;
       const active = this.getActiveDeck();
-      active?.play().catch(() => {});
+      if (active && active.paused) {
+        active.play().catch(() => {});
+      }
     }
+    this.notify();
+  }
+
+  /**
+   * Прямая привязка плеера к главному экрану приложения (4 основные вкладки: Арена, Эволюция, Поколения, Рейтинг).
+   * На экране загрузки или в любом другом состоянии плеер жестко выключен.
+   */
+  public setMainScreenActive(active: boolean): void {
+    this.isMainScreenActive = active;
+
+    if (!active) {
+      if (this.fadeIntervalId !== null) {
+        window.clearInterval(this.fadeIntervalId);
+        this.fadeIntervalId = null;
+      }
+      this.isCrossfading = false;
+      this.isPlaying = false;
+      this.deckA?.pause();
+      this.deckB?.pause();
+      this.notify();
+      return;
+    }
+
+    this.isUnloading = false;
+    if (!this.userExplicitlyPaused && !this.systemPaused) {
+      this.isPlaying = true;
+      const inactive = this.getInactiveDeck();
+      if (!this.isCrossfading && inactive && !inactive.paused) {
+        inactive.pause();
+      }
+      const activeDeck = this.getActiveDeck() || this.deckA;
+      if (activeDeck) {
+        if (!activeDeck.src) {
+          this.prepareDeck(activeDeck, this.currentTrackIndex);
+        }
+        this.syncPhysicalVolumes();
+        this.applyPlaybackRateToDeck(activeDeck);
+        if (activeDeck.paused) {
+          activeDeck.play().catch(() => {});
+        }
+      }
+    }
+    this.notify();
+  }
+
+  /**
+   * Гарантирует полную загрузку и буферизацию трека для экрана загрузки (БЕЗ запуска воспроизведения).
+   */
+  public async ensureTrackLoaded(trackIndex = 0): Promise<void> {
+    const track = LOOKSMAX_PLAYLIST[trackIndex] || LOOKSMAX_PLAYLIST[0];
+    const active = this.getActiveDeck() || this.deckA;
+    if (!active) return;
+
+    if (active.readyState >= 2) {
+      this.getOrLoadBlobUrl(track.streamUrl).catch(() => {});
+      return;
+    }
+
+    const blobUrl = await Promise.race([
+      this.getOrLoadBlobUrl(track.streamUrl),
+      new Promise<string>((resolve) => setTimeout(() => resolve(track.streamUrl), 2500)),
+    ]);
+
+    if (active.readyState < 2 && active.src !== blobUrl && !active.src.endsWith(track.streamUrl)) {
+      active.src = blobUrl;
+      active.load();
+    }
+
+    if (active.readyState >= 2) {
+      return;
+    }
+
+    return new Promise<void>((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        active.removeEventListener('canplay', finish);
+        active.removeEventListener('loadeddata', finish);
+        active.removeEventListener('loadedmetadata', finish);
+        active.removeEventListener('error', finish);
+        resolve();
+      };
+
+      active.addEventListener('canplay', finish, { once: true });
+      active.addEventListener('loadeddata', finish, { once: true });
+      active.addEventListener('loadedmetadata', finish, { once: true });
+      active.addEventListener('error', finish, { once: true });
+
+      setTimeout(finish, 2500);
+    });
+  }
+
+  /**
+   * Вызывается при переходе с экрана загрузки на главный экран
+   */
+  public startPlaybackWithGesture(): void {
+    this.userExplicitlyPaused = false;
+    this.systemPaused = false;
+    this.setMainScreenActive(true);
+  }
+
+  /**
+   * Полностью выключает плеер и останавливает оба аудио-потока при обновлении страницы или закрытии приложения.
+   */
+  public shutdown(): void {
+    this.isMainScreenActive = false;
+    this.isUnloading = true;
+    this.systemPaused = true;
+    this.isPlaying = false;
+    this.isCrossfading = false;
+
+    if (this.watchdogIntervalId !== null) {
+      window.clearInterval(this.watchdogIntervalId);
+      this.watchdogIntervalId = null;
+    }
+    if (this.fadeIntervalId !== null) {
+      window.clearInterval(this.fadeIntervalId);
+      this.fadeIntervalId = null;
+    }
+
+    if (this.deckA) {
+      this.deckA.pause();
+      this.deckA.volume = 0;
+      this.deckA.removeAttribute('src');
+      this.deckA.load();
+    }
+    if (this.deckB) {
+      this.deckB.pause();
+      this.deckB.volume = 0;
+      this.deckB.removeAttribute('src');
+      this.deckB.load();
+    }
+
     this.notify();
   }
 }

@@ -54,14 +54,6 @@ export const LooksmaxMusicPlayer: React.FC = () => {
     });
   }, []);
 
-  // Предзагрузка всех 5 GIF в память браузера при старте, чтобы переключение было мгновенным (0 мс)
-  useEffect(() => {
-    LOOKSMAX_DANCERS.forEach((dancer) => {
-      const preloadImg = new Image();
-      preloadImg.src = dancer.gifUrl;
-    });
-  }, []);
-
   const currentTrack = looksmaxMusic.getCurrentTrack();
   const currentIndex = looksmaxMusic.getCurrentTrackIndex();
   const isPlaying = looksmaxMusic.getIsPlaying();
@@ -95,7 +87,7 @@ export const LooksmaxMusicPlayer: React.FC = () => {
               width={320}
               height={420}
               loading="eager"
-              decoding="sync"
+              decoding="async"
               alt={dancer.name}
               className={`absolute inset-0 w-full h-full object-cover ${
                 idx === activeDancerIdx ? 'opacity-100 z-10' : 'opacity-0 z-0'

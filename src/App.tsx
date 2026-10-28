@@ -19,6 +19,8 @@ import {
 import { RankPortraitThumb } from './components/RankPortraitThumb';
 import { UpgradeSketchArt } from './components/UpgradeSketchArt';
 import { LooksmaxMusicPlayer } from './components/LooksmaxMusicPlayer';
+import { LooksmaxLoadingScreen } from './components/LooksmaxLoadingScreen';
+import { looksmaxMusic } from './modules/musicPlayer';
 import {
   calculateItemCost,
   calculateMaxAffordable,
@@ -50,6 +52,9 @@ type ActiveSection = 'arena' | 'evolution' | 'rebirth' | 'leaderboard';
 type BuyMultiplierMode = 1 | 10 | 'MAX';
 
 export default function App() {
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [isProfileLoaded, setIsProfileLoaded] = useState<boolean>(false);
+  const [isAtlasLoaded, setIsAtlasLoaded] = useState<boolean>(false);
   const [profile, setProfile] = useState<PlayerProfileData>(() => createDefaultProfile());
   const [sdkMode, setSdkMode] = useState<'yagames_cloud' | 'local_storage'>('local_storage');
   const [activeSection, setActiveSection] = useState<ActiveSection>('arena');
@@ -83,20 +88,29 @@ export default function App() {
   useEffect(() => {
     const cleanupGuards = installYandexGamesPlatformGuards();
 
+    let mounted = true;
     const spriteRenderer = new PSLSpriteRenderer(() => {
+      if (!mounted) return;
       setAtlasImage(spriteRenderer.getAtlasImage());
+      setIsAtlasLoaded(true);
     });
     rendererRef.current = spriteRenderer;
 
-    let mounted = true;
-    profileManager.initializeAndLoad().then(({ profile: loaded, offlineReport, sdkMode: mode }) => {
-      if (!mounted) return;
-      setProfile(loaded);
-      setSdkMode(mode);
-      if (offlineReport && offlineReport.looksEarned > 0) {
-        setOfflineBanner(offlineReport);
-      }
-    });
+    profileManager
+      .initializeAndLoad()
+      .then(({ profile: loaded, offlineReport, sdkMode: mode }) => {
+        if (!mounted) return;
+        setProfile(loaded);
+        setSdkMode(mode);
+        setIsProfileLoaded(true);
+        if (offlineReport && offlineReport.looksEarned > 0) {
+          setOfflineBanner(offlineReport);
+        }
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setIsProfileLoaded(true);
+      });
 
     return () => {
       mounted = false;
@@ -125,8 +139,25 @@ export default function App() {
     ]
   );
 
+  // Прямая привязка работы плеера к главному экрану (Арена, Эволюция, Поколения, Рейтинг).
+  // На этапе загрузки или вне этих 4 вкладок музыка полностью выключена.
+  const isMainScreenWithMusic =
+    !isInitialLoading &&
+    (activeSection === 'arena' ||
+      activeSection === 'evolution' ||
+      activeSection === 'rebirth' ||
+      activeSection === 'leaderboard');
+
+  useEffect(() => {
+    looksmaxMusic.setMainScreenActive(isMainScreenWithMusic);
+    return () => {
+      looksmaxMusic.setMainScreenActive(false);
+    };
+  }, [isMainScreenWithMusic]);
+
   // 3. Главный игровой тик экономики (10 раз в секунду для плавного прироста) + затухание комбо
   useEffect(() => {
+    if (isInitialLoading) return;
     const tickIntervalMs = 100;
     const dt = tickIntervalMs / 1000;
 
@@ -178,27 +209,32 @@ export default function App() {
     }, tickIntervalMs);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [isInitialLoading]);
 
   // 4. Асинхронное автосохранение каждые 5 секунд и при выгрузке страницы
   useEffect(() => {
+    if (isInitialLoading) return;
     const saveTimer = window.setInterval(() => {
       profileManager.saveProfileAsync(profileRef.current, false);
     }, 5000);
 
     const handleBeforeUnload = () => {
+      looksmaxMusic.shutdown();
       profileManager.saveProfileAsync(profileRef.current, true);
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
     return () => {
       window.clearInterval(saveTimer);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
     };
-  }, []);
+  }, [isInitialLoading]);
 
   // 5. Цикл рендеринга HTML5 Canvas (60 FPS) для центральной сцены персонажа
   useEffect(() => {
+    if (isInitialLoading) return;
     let animationFrameId: number;
 
     const renderLoop = () => {
@@ -245,7 +281,7 @@ export default function App() {
 
     animationFrameId = window.requestAnimationFrame(renderLoop);
     return () => window.cancelAnimationFrame(animationFrameId);
-  }, [activeSection]);
+  }, [activeSection, isInitialLoading]);
 
   // Обработчик ручного клика по портрету (Мьюинг + Критический удар Молотка)
   const handleStagePointerDown = useCallback(
@@ -473,72 +509,71 @@ export default function App() {
     [profile]
   );
 
+  // Пока идет этап загрузки — рендерим ТОЛЬКО экран загрузки, главный экран и плеер выключены
+  if (isInitialLoading) {
+    return (
+      <LooksmaxLoadingScreen
+        isProfileLoaded={isProfileLoaded}
+        isAtlasLoaded={isAtlasLoaded || atlasImage !== null}
+        onFinish={() => {
+          setIsInitialLoading(false);
+          looksmaxMusic.startPlaybackWithGesture();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0F1419] text-[#F1F5F9] flex flex-col">
       {/* Top Bar Contract: 3 зоны с разделением gap-8 */}
       <header className="flex items-center justify-between gap-8 px-6 py-3.5 border-b border-[#2A343D] bg-[#141B21]">
         {/* Zone 1: Brand Wordmark */}
-        <a
-          href="#arena"
-          onClick={(e) => {
-            e.preventDefault();
-            setActiveSection('arena');
-          }}
-          className="text-lg font-bold tracking-tight text-[#F1F5F9] font-display whitespace-nowrap shrink-0"
+        <button
+          type="button"
+          onClick={() => setActiveSection('arena')}
+          className="text-lg font-bold tracking-tight text-[#F1F5F9] font-display whitespace-nowrap shrink-0 cursor-pointer"
         >
           PSL Ascension
-        </a>
+        </button>
 
         {/* Zone 2: 4 однострочные навигационные ссылки */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-[#94A3B8]">
-          <a
-            href="#arena"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveSection('arena');
-            }}
-            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 ${
+          <button
+            type="button"
+            onClick={() => setActiveSection('arena')}
+            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               activeSection === 'arena' ? 'text-[#F1F5F9] underline underline-offset-8 decoration-emerald-500' : ''
             }`}
           >
             Арена прокачки
-          </a>
-          <a
-            href="#evolution"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveSection('evolution');
-            }}
-            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 ${
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection('evolution')}
+            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               activeSection === 'evolution' ? 'text-[#F1F5F9] underline underline-offset-8 decoration-emerald-500' : ''
             }`}
           >
             Эволюция PSL (8 стадий)
-          </a>
-          <a
-            href="#rebirth"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveSection('rebirth');
-            }}
-            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 ${
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection('rebirth')}
+            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               activeSection === 'rebirth' ? 'text-[#F1F5F9] underline underline-offset-8 decoration-amber-500' : ''
             }`}
           >
             Поколения и ДНК {stats.canRebirth ? `(+${stats.pendingRebirthDNA})` : ''}
-          </a>
-          <a
-            href="#leaderboard"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveSection('leaderboard');
-            }}
-            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 ${
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection('leaderboard')}
+            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               activeSection === 'leaderboard' ? 'text-[#F1F5F9] underline underline-offset-8 decoration-emerald-500' : ''
             }`}
           >
             Рейтинг и Баланс
-          </a>
+          </button>
         </nav>
 
         {/* Zone 3: 1 основное действие (Rewarded Boost Яндекс Игр) */}
