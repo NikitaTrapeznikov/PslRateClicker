@@ -91,3 +91,71 @@
   animation: sigmaOverdrivePulse 1.2s ease-in-out infinite;
 }
 
+@keyframes adamsFloat {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-12px) scale(1.02);
+  }
+}
+
+.animate-adams-float {
+  animation: adamsFloat 6.5s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes goldGenePulse {
+  0%, 100% {
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.75), 0 0 22px rgba(251, 191, 36, 0.42), inset 0 0 16px rgba(251, 191, 36, 0.14);
+    border-color: rgba(251, 191, 36, 0.95);
+  }
+  50% {
+    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.8), 0 0 34px rgba(245, 158, 11, 0.7), inset 0 0 24px rgba(251, 191, 36, 0.25);
+    border-color: rgba(254, 240, 138, 1);
+  }
+}
+
+.animate-gold-gene {
+  animation: goldGenePulse 2.4s ease-in-out infinite;
+}
+
+@keyframes rebirthShockwave {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(2.35);
+    opacity: 0;
+  }
+}
+
+.animate-rebirth-shockwave {
+  animation: rebirthShockwave 1.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes rebirthBannerPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(14px);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1.04) translateY(0px);
+  }
+  82% {
+    opacity: 1;
+    transform: scale(1) translateY(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.06) translateY(-8px);
+  }
+}
+
+.animate-rebirth-banner {
+  animation: rebirthBannerPop 1.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+

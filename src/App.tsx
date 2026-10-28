@@ -21,6 +21,7 @@ import {
   EvolutionAtlasView,
   GeneticsRebirthView,
   LeaderboardAndBalanceView,
+  RebirthStarryBackground,
 } from './components/ModalsAndPanels';
 import { RankPortraitThumb } from './components/RankPortraitThumb';
 import { UpgradeSketchArt } from './components/UpgradeSketchArt';
@@ -819,24 +820,29 @@ export default function App() {
         </>
       )}
 
-      {/* Top Bar Contract: 3 зоны с разделением gap-8 */}
-      <header className="relative z-10 flex items-center justify-between gap-8 px-6 py-3.5 border-b border-[#2A343D] bg-[#141B21]/90 backdrop-blur-md">
+      {/* ТОЛЬКО ДЛЯ ВКЛАДКИ ПОКОЛЕНИЯ И ДНК: Яркое звездное небо + фото Адамов без затухания */}
+      {activeSection === 'rebirth' && <RebirthStarryBackground />}
+
+      {/* Top Bar Contract: 3 зоны с разделением gap-8 (z-30 и плотная подложка, чтобы все вкладки были отлично видны на любом фоне) */}
+      <header className="relative z-30 flex items-center justify-between gap-8 px-6 py-3.5 border-b border-white/15 bg-[#0B1017]/95 backdrop-blur-md shadow-[0_6px_24px_rgba(0,0,0,0.75)]">
         {/* Zone 1: Brand Wordmark */}
         <button
           type="button"
           onClick={() => setActiveSection('arena')}
-          className="text-lg font-bold tracking-tight text-[#F1F5F9] font-display whitespace-nowrap shrink-0 cursor-pointer"
+          className="text-lg font-bold tracking-tight text-white font-display whitespace-nowrap shrink-0 cursor-pointer"
         >
           PSL Ascension
         </button>
 
-        {/* Zone 2: 4 однострочные навигационные ссылки */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-[#94A3B8]">
+        {/* Zone 2: 4 навигационные вкладки с высокой контрастностью */}
+        <nav className="hidden md:flex items-center gap-2.5 text-sm font-semibold">
           <button
             type="button"
             onClick={() => setActiveSection('arena')}
-            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeSection === 'arena' ? 'text-[#F1F5F9] underline underline-offset-8 decoration-emerald-500' : ''
+            className={`px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
+              activeSection === 'arena'
+                ? 'bg-emerald-500/20 text-white border-emerald-400/60 shadow-[0_0_16px_rgba(16,185,129,0.25)]'
+                : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10 hover:text-white'
             }`}
           >
             Арена прокачки
@@ -844,8 +850,10 @@ export default function App() {
           <button
             type="button"
             onClick={() => setActiveSection('evolution')}
-            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeSection === 'evolution' ? 'text-[#F1F5F9] underline underline-offset-8 decoration-emerald-500' : ''
+            className={`px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
+              activeSection === 'evolution'
+                ? 'bg-emerald-500/20 text-white border-emerald-400/60 shadow-[0_0_16px_rgba(16,185,129,0.25)]'
+                : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10 hover:text-white'
             }`}
           >
             Эволюция PSL (8 стадий)
@@ -853,8 +861,10 @@ export default function App() {
           <button
             type="button"
             onClick={() => setActiveSection('rebirth')}
-            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeSection === 'rebirth' ? 'text-[#F1F5F9] underline underline-offset-8 decoration-amber-500' : ''
+            className={`px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
+              activeSection === 'rebirth'
+                ? 'bg-amber-500/25 text-amber-300 border-amber-400/70 shadow-[0_0_16px_rgba(245,158,11,0.3)]'
+                : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10 hover:text-white'
             }`}
           >
             Поколения и ДНК {stats.canRebirth ? `(+${stats.pendingRebirthDNA})` : ''}
@@ -862,8 +872,10 @@ export default function App() {
           <button
             type="button"
             onClick={() => setActiveSection('leaderboard')}
-            className={`hover:text-[#F1F5F9] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeSection === 'leaderboard' ? 'text-[#F1F5F9] underline underline-offset-8 decoration-emerald-500' : ''
+            className={`px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
+              activeSection === 'leaderboard'
+                ? 'bg-emerald-500/20 text-white border-emerald-400/60 shadow-[0_0_16px_rgba(16,185,129,0.25)]'
+                : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10 hover:text-white'
             }`}
           >
             Рейтинг и Баланс
@@ -892,12 +904,14 @@ export default function App() {
       </header>
 
       {/* Мобильная панель переключения разделов */}
-      <div className="md:hidden grid grid-cols-4 gap-1 p-2 bg-[#141B21] border-b border-[#2A343D]">
+      <div className="relative z-30 md:hidden grid grid-cols-4 gap-1.5 p-2 bg-[#0B1017]/95 backdrop-blur-md border-b border-white/15 shadow-md">
         <button
           type="button"
           onClick={() => setActiveSection('arena')}
-          className={`py-2 px-2 rounded text-xs font-medium whitespace-nowrap truncate ${
-            activeSection === 'arena' ? 'bg-[#222C34] text-[#F1F5F9]' : 'text-[#94A3B8]'
+          className={`py-2 px-2 rounded-lg text-xs font-semibold whitespace-nowrap truncate border ${
+            activeSection === 'arena'
+              ? 'bg-emerald-500/20 text-white border-emerald-400/60'
+              : 'bg-white/5 text-slate-200 border-white/10'
           }`}
         >
           Арена
@@ -905,8 +919,10 @@ export default function App() {
         <button
           type="button"
           onClick={() => setActiveSection('evolution')}
-          className={`py-2 px-2 rounded text-xs font-medium whitespace-nowrap truncate ${
-            activeSection === 'evolution' ? 'bg-[#222C34] text-[#F1F5F9]' : 'text-[#94A3B8]'
+          className={`py-2 px-2 rounded-lg text-xs font-semibold whitespace-nowrap truncate border ${
+            activeSection === 'evolution'
+              ? 'bg-emerald-500/20 text-white border-emerald-400/60'
+              : 'bg-white/5 text-slate-200 border-white/10'
           }`}
         >
           8 стадий
@@ -914,8 +930,10 @@ export default function App() {
         <button
           type="button"
           onClick={() => setActiveSection('rebirth')}
-          className={`py-2 px-2 rounded text-xs font-medium whitespace-nowrap truncate ${
-            activeSection === 'rebirth' ? 'bg-[#222C34] text-amber-400' : 'text-[#94A3B8]'
+          className={`py-2 px-2 rounded-lg text-xs font-semibold whitespace-nowrap truncate border ${
+            activeSection === 'rebirth'
+              ? 'bg-amber-500/25 text-amber-300 border-amber-400/70'
+              : 'bg-white/5 text-slate-200 border-white/10'
           }`}
         >
           Реборн
@@ -923,8 +941,10 @@ export default function App() {
         <button
           type="button"
           onClick={() => setActiveSection('leaderboard')}
-          className={`py-2 px-2 rounded text-xs font-medium whitespace-nowrap truncate ${
-            activeSection === 'leaderboard' ? 'bg-[#222C34] text-[#F1F5F9]' : 'text-[#94A3B8]'
+          className={`py-2 px-2 rounded-lg text-xs font-semibold whitespace-nowrap truncate border ${
+            activeSection === 'leaderboard'
+              ? 'bg-emerald-500/20 text-white border-emerald-400/60'
+              : 'bg-white/5 text-slate-200 border-white/10'
           }`}
         >
           Рейтинг
