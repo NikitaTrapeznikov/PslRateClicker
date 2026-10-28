@@ -174,7 +174,7 @@ export interface ShopItemDefinition {
  * Полный каталог магазина улучшений (Молоток, мази, уход, зал, хирургия).
  */
 export const SHOP_ITEMS: ShopItemDefinition[] = [
-  // === АКТИВНЫЕ ПРАКТИКИ (РУЧНОЙ КЛИК) ===
+  // === АКТИВНЫЕ ПРАКТИКИ (РУЧНОЙ КЛИК — сокращены на ~12-15%) ===
   {
     id: 'mewing_posture',
     name: 'Вакуумный Мьюинг',
@@ -183,7 +183,7 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     description: 'Плотная фиксация всей спинки языка на нёбе. Увеличивает базовую силу каждого клика.',
     baseCost: 15,
     costGrowth: 1.15,
-    baseClickBonus: 1.5,
+    baseClickBonus: 1.3,
     basePassiveBonus: 0,
     unlockAtRankIndex: 0,
   },
@@ -195,7 +195,7 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     description: 'Твердая смола с острова Хиос для гипертрофии массетеров и расширения углов нижней челюсти.',
     baseCost: 140,
     costGrowth: 1.16,
-    baseClickBonus: 9,
+    baseClickBonus: 7.8,
     basePassiveBonus: 0,
     unlockAtRankIndex: 0,
   },
@@ -204,12 +204,12 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     name: 'Нефритовый скребок Гуаша',
     category: 'click',
     tag: 'Лимфодренаж + Синергия',
-    description: 'Выводит застойную жидкость и добавляет +1.2% от вашего пассивного дохода в секунду к каждому клику.',
+    description: 'Выводит застойную жидкость и добавляет +1.0% от вашего пассивного дохода в секунду к каждому клику.',
     baseCost: 1_250,
     costGrowth: 1.17,
-    baseClickBonus: 48,
+    baseClickBonus: 42,
     basePassiveBonus: 0,
-    passiveToClickSynergy: 0.012,
+    passiveToClickSynergy: 0.01,
     unlockAtRankIndex: 1,
   },
   {
@@ -220,10 +220,10 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     description: 'Микро-импульсы по закону Вольфа для уплотнения скуловой кости. Повышает шанс и множитель крита!',
     baseCost: 14_500,
     costGrowth: 1.18,
-    baseClickBonus: 320,
+    baseClickBonus: 275,
     basePassiveBonus: 0,
     critChanceBonus: 0.018,
-    critMultiplierBonus: 0.45,
+    critMultiplierBonus: 0.4,
     unlockAtRankIndex: 2,
   },
   {
@@ -234,9 +234,9 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     description: 'Изометрическая нагрузка на переднюю группу мышц шеи и подбородка без риска для сустава.',
     baseCost: 190_000,
     costGrowth: 1.17,
-    baseClickBonus: 2_600,
+    baseClickBonus: 2_250,
     basePassiveBonus: 0,
-    passiveToClickSynergy: 0.018,
+    passiveToClickSynergy: 0.015,
     unlockAtRankIndex: 3,
   },
   {
@@ -247,13 +247,13 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     description: 'Фокусированный импульс для мгновенного сокращения связочного каркаса лица при каждом клике.',
     baseCost: 3_200_000,
     costGrowth: 1.18,
-    baseClickBonus: 28_000,
+    baseClickBonus: 24_000,
     basePassiveBonus: 0,
-    critMultiplierBonus: 0.85,
+    critMultiplierBonus: 0.75,
     unlockAtRankIndex: 4,
   },
 
-  // === ПАССИВНЫЙ УХОД (МАЗИ, СЫВОРОТКИ, ЗАЛ И ОПЕРАЦИИ) ===
+  // === ПАССИВНЫЙ УХОД (МАЗИ, СЫВОРОТКИ, ЗАЛ И ОПЕРАЦИИ — снижена доходность) ===
   {
     id: 'panthenol_ointment',
     name: 'Увлажняющая мазь с пантенолом',
@@ -263,7 +263,7 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     baseCost: 25,
     costGrowth: 1.15,
     baseClickBonus: 0,
-    basePassiveBonus: 2.2,
+    basePassiveBonus: 1.4,
     unlockAtRankIndex: 0,
   },
   {
@@ -275,7 +275,7 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     baseCost: 260,
     costGrowth: 1.155,
     baseClickBonus: 0,
-    basePassiveBonus: 16,
+    basePassiveBonus: 10,
     unlockAtRankIndex: 0,
   },
   {
@@ -287,7 +287,7 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     baseCost: 2_800,
     costGrowth: 1.16,
     baseClickBonus: 0,
-    basePassiveBonus: 115,
+    basePassiveBonus: 72,
     unlockAtRankIndex: 1,
   },
   {
@@ -299,7 +299,7 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     baseCost: 32_000,
     costGrowth: 1.165,
     baseClickBonus: 0,
-    basePassiveBonus: 860,
+    basePassiveBonus: 540,
     unlockAtRankIndex: 2,
   },
   {
@@ -311,7 +311,7 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     baseCost: 380_000,
     costGrowth: 1.17,
     baseClickBonus: 0,
-    basePassiveBonus: 6_800,
+    basePassiveBonus: 4_200,
     unlockAtRankIndex: 3,
   },
   {
@@ -323,7 +323,7 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     baseCost: 4_800_000,
     costGrowth: 1.175,
     baseClickBonus: 0,
-    basePassiveBonus: 58_000,
+    basePassiveBonus: 36_000,
     unlockAtRankIndex: 4,
   },
   {
@@ -335,7 +335,7 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     baseCost: 65_000_000,
     costGrowth: 1.18,
     baseClickBonus: 0,
-    basePassiveBonus: 520_000,
+    basePassiveBonus: 320_000,
     unlockAtRankIndex: 5,
   },
   {
@@ -347,7 +347,7 @@ export const SHOP_ITEMS: ShopItemDefinition[] = [
     baseCost: 950_000_000,
     costGrowth: 1.185,
     baseClickBonus: 0,
-    basePassiveBonus: 5_400_000,
+    basePassiveBonus: 3_300_000,
     unlockAtRankIndex: 6,
   },
 ];
@@ -556,18 +556,15 @@ export function getNextRank(currentRankIndex: number): PSLRankDefinition | null 
 
 /**
  * Рассчитывает количество Очков ДНК, которые игрок получит при Смене Поколения (Реборне).
- * Реборн открывается начиная с ранга Chadlite (15,000,000 очков в текущем поколении).
+ * Реборн открывается начиная с ранга Chadlite (15,000,000 очков в текущем поколении) и всегда дает ровно 1 ДНК.
  */
 export function calculatePendingRebirthDNA(
   currentRunTotalLooks: number,
-  generation: number
+  _generation: number
 ): number {
   const chadliteThreshold = PSL_RANKS[5].requiredLooks; // 15,000,000
   if (currentRunTotalLooks < chadliteThreshold) return 0;
-
-  const base = Math.pow(currentRunTotalLooks / 10_000_000, 0.52);
-  const genBonus = 1 + (generation - 1) * 0.15;
-  return Math.max(1, Math.floor(base * genBonus));
+  return 1;
 }
 
 export interface ComputedStats {
@@ -638,7 +635,7 @@ export function computePlayerStats(params: {
 
   // 1. Считаем базовый пассивный доход от мазей, ухода, зала и операций
   let rawPassive = 0;
-  let rawClick = 1; // Базовый клик = 1 PSL
+  let rawClick = 0.88; // Базовый клик снижен на ~12%
   let synergyRate = 0;
   let hammerCritChance = 0.04; // Базовый 4% шанс крита
   let hammerCritMult = 3.0; // Базовый x3 крит
@@ -676,7 +673,7 @@ export function computePlayerStats(params: {
   const passivePerSecond = rawPassive * hollowCheeksMultiplier * globalMultiplier;
 
   // Синергия от Гуаша и эспандера добавляет % от пассивного дохода к клику
-  const synergyClickBonus = passivePerSecond * Math.min(0.35, synergyRate);
+  const synergyClickBonus = passivePerSecond * Math.min(0.28, synergyRate);
   const clickPower =
     rawClick * hunterEyesMultiplier * globalMultiplier + synergyClickBonus;
 

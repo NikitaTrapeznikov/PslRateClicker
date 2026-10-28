@@ -263,7 +263,7 @@ export default function App() {
           normY,
           label,
           spawnedAtMs: performance.now(),
-          durationMs: 6000,
+          durationMs: 10500,
         });
         setMirrorTargetProgress(1);
         scheduleNextTarget(false);
@@ -725,8 +725,8 @@ export default function App() {
       if (!mirrorTarget) return;
 
       const instantBonus = Math.max(
-        30,
-        Math.floor(stats.passivePerSecond * 18 + stats.clickPower * 14)
+        18,
+        Math.floor(stats.passivePerSecond * 7 + stats.clickPower * 6)
       );
 
       soundEngine.playHammerCrit();
@@ -741,7 +741,7 @@ export default function App() {
       setMirrorTarget(null);
       spawnAuraWave(true);
       setMewingCombo(100);
-      setAuraFrenzyRemainingSec((prev) => Math.min(30, prev + 12));
+      setAuraFrenzyRemainingSec((prev) => Math.min(45, prev + 20));
 
       setProfile((prev) => {
         const prevRank = computePlayerStats({
@@ -751,7 +751,7 @@ export default function App() {
           perkLevels: prev.perkLevels,
           mewingCombo: 100,
           rewardedBoostRemainingSec: prev.rewardedBoostRemainingSec,
-          auraFrenzyRemainingSec: 12,
+          auraFrenzyRemainingSec: 20,
         }).currentRank;
 
         const nextRunLooks = prev.currentRunTotalLooks + instantBonus;
@@ -762,7 +762,7 @@ export default function App() {
           perkLevels: prev.perkLevels,
           mewingCombo: 100,
           rewardedBoostRemainingSec: prev.rewardedBoostRemainingSec,
-          auraFrenzyRemainingSec: 12,
+          auraFrenzyRemainingSec: 20,
         }).currentRank;
 
         if (nextRank.index > prevRank.index) {
