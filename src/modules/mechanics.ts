@@ -450,6 +450,36 @@ export function getNextMilestone(level: number): number | null {
   return null;
 }
 
+export function getPreviousMilestone(level: number): number {
+  let prev = 0;
+  for (const m of ITEM_MILESTONES) {
+    if (level >= m) {
+      prev = m;
+    } else {
+      break;
+    }
+  }
+  return prev;
+}
+
+/**
+ * Палитра контурной LED-подсветки Умного Зеркала для каждого из 8 рангов PSL.
+ */
+export const RANK_LED_PALETTES: Array<{
+  rgb: string;
+  accentHex: string;
+  label: string;
+}> = [
+  { rgb: '148, 163, 184', accentHex: '#94A3B8', label: 'Стальной холодный' }, // Sub 3
+  { rgb: '56, 189, 248', accentHex: '#38BDF8', label: 'Ледяной циан' }, // Sub 5
+  { rgb: '34, 211, 238', accentHex: '#22D3EE', label: 'Крио-аква' }, // LTN
+  { rgb: '16, 185, 129', accentHex: '#10B981', label: 'Изумрудный тонус' }, // MTN
+  { rgb: '52, 211, 153', accentHex: '#34D399', label: 'Неоновый нефрит' }, // HTN
+  { rgb: '129, 140, 248', accentHex: '#818CF8', label: 'Индиго престиж' }, // Chadlite
+  { rgb: '192, 132, 252', accentHex: '#C084FC', label: 'Плазменный пурпур' }, // Chad
+  { rgb: '251, 191, 36', accentHex: '#FBBF24', label: 'Золотое сечение Адама' }, // True Adam
+];
+
 /**
  * Рассчитывает стоимость покупки `count` уровней предмета с учетом скидки перка Forward Maxilla.
  */
@@ -546,6 +576,7 @@ export interface ComputedStats {
   progressToNextRank: number; // 0..100
   generationMultiplier: number;
   rewardedBoostMultiplier: number;
+  auraFrenzyMultiplier: number;
   mewingComboMultiplier: number;
   passivePerSecond: number;
   clickPower: number;
@@ -565,6 +596,7 @@ export function computePlayerStats(params: {
   perkLevels: Record<string, number>;
   mewingCombo: number; // 0..100
   rewardedBoostRemainingSec: number;
+  auraFrenzyRemainingSec?: number;
 }): ComputedStats {
   const {
     currentRunTotalLooks,
@@ -573,6 +605,7 @@ export function computePlayerStats(params: {
     perkLevels,
     mewingCombo,
     rewardedBoostRemainingSec,
+    auraFrenzyRemainingSec = 0,
   } = params;
 
   const currentRank = getCurrentRank(currentRunTotalLooks);
@@ -590,6 +623,9 @@ export function computePlayerStats(params: {
 
   // Буст за просмотр рекламы Яндекс Игр (x2)
   const rewardedBoostMultiplier = rewardedBoostRemainingSec > 0 ? 2.0 : 1.0;
+
+  // Буст от перехвата бонус-мишени на Умном Зеркале (x2.5)
+  const auraFrenzyMultiplier = auraFrenzyRemainingSec > 0 ? 2.5 : 1.0;
 
   // Комбо удержания ритма мьюинга (до +75% к доходу и клику)
   const maxComboBonus = 0.75 * (1 + (perkLevels['adams_lineage'] || 0) * 0.2);
@@ -634,6 +670,7 @@ export function computePlayerStats(params: {
     currentRank.rankMultiplier *
     generationMultiplier *
     rewardedBoostMultiplier *
+    auraFrenzyMultiplier *
     mewingComboMultiplier;
 
   const passivePerSecond = rawPassive * hollowCheeksMultiplier * globalMultiplier;
@@ -655,6 +692,7 @@ export function computePlayerStats(params: {
     progressToNextRank,
     generationMultiplier,
     rewardedBoostMultiplier,
+    auraFrenzyMultiplier,
     mewingComboMultiplier,
     passivePerSecond,
     clickPower,

@@ -3,6 +3,8 @@ import React from 'react';
 interface UpgradeSketchArtProps {
   itemId: string;
   locked?: boolean;
+  marketplaceTheme?: 'ozon' | 'wb';
+  isHotDeal?: boolean;
 }
 
 /**
@@ -12,13 +14,40 @@ interface UpgradeSketchArtProps {
 export const UpgradeSketchArt: React.FC<UpgradeSketchArtProps> = ({
   itemId,
   locked = false,
+  marketplaceTheme,
+  isHotDeal = false,
 }) => {
+  const frameBorderClass =
+    marketplaceTheme === 'ozon'
+      ? isHotDeal
+        ? 'border-[#F91155] shadow-[0_0_12px_rgba(249,17,85,0.28)]'
+        : 'border-[#005BFF]/60'
+      : marketplaceTheme === 'wb'
+      ? isHotDeal
+        ? 'border-[#F43F5E] shadow-[0_0_12px_rgba(203,17,171,0.32)]'
+        : 'border-[#CB11AB]/60'
+      : 'border-[#2A343D]';
+
   return (
     <div
-      className={`w-14 h-14 rounded-lg border border-[#2A343D] bg-white flex items-center justify-center overflow-hidden shrink-0 ${
+      className={`relative w-14 h-14 rounded-xl border-2 ${frameBorderClass} bg-white flex items-center justify-center overflow-hidden shrink-0 transition-colors duration-200 ${
         locked ? 'grayscale opacity-45' : ''
       }`}
     >
+      {/* Фирменный уголок витрины (кобальт/коралл для Клик-маркета или ягодно-пурпурный для Уход-маркета) */}
+      {!locked && marketplaceTheme && (
+        <div
+          className={`pointer-events-none absolute top-0 left-0 w-3.5 h-3.5 rounded-br-md ${
+            marketplaceTheme === 'ozon'
+              ? isHotDeal
+                ? 'bg-[#F91155]'
+                : 'bg-[#005BFF]'
+              : isHotDeal
+              ? 'bg-[#F43F5E]'
+              : 'bg-[#CB11AB]'
+          }`}
+        />
+      )}
       <svg
         viewBox="0 0 64 64"
         className="w-12 h-12 text-slate-900"
