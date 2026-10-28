@@ -497,98 +497,45 @@ const PERK_GIF_META: Record<string, PerkGifMeta> = {
   },
 };
 
-interface AestheticsAdamCard {
-  id: string;
-  name: string;
-  title: string;
-  pslBadge: string;
-  traitTag: string;
-  imageUrl: string;
-  accentHex: string;
-  rgb: string;
-  floatPosClass: string;
-}
-
-const AESTHETICS_ADAMS_PANTHEON: AestheticsAdamCard[] = [
+// Чистые фото эталонов эстетики / Адамов для космического фона (без надписей и плашек)
+const BACKGROUND_ADAMS_PHOTOS = [
   {
-    id: 'sean_opry',
-    name: "Sean O'Pry",
-    title: 'Hunter Eyes & Aesthetics',
-    pslBadge: '9.8 PSL · TRUE ADAM',
-    traitTag: 'Идеальный кантальный наклон + рельеф',
-    imageUrl: '/assets/adams/sean_opry_2.jpg',
-    accentHex: '#38BDF8',
-    rgb: '56, 189, 248',
-    floatPosClass: 'top-[11%] left-[2%] -rotate-6',
+    src: '/assets/adams/sean_opry_2.jpg',
+    className: 'top-[9%] left-[2%] w-44 sm:w-56 md:w-64 aspect-[3/4] -rotate-6',
   },
   {
-    id: 'david_laid',
-    name: 'David Laid',
-    title: 'God Tier Aesthetics Physique',
-    pslBadge: 'AESTHETICS · V-TAPER',
-    traitTag: 'Пиковая эстетика пропорций тела',
-    imageUrl: '/assets/perks/david_laid.gif',
-    accentHex: '#F59E0B',
-    rgb: '245, 158, 11',
-    floatPosClass: 'bottom-[8%] left-[3%] rotate-3',
+    src: '/assets/adams/david_gandy_2.jpg',
+    className: 'top-[10%] right-[2%] w-44 sm:w-56 md:w-64 aspect-[3/4] rotate-6',
   },
   {
-    id: 'david_gandy',
-    name: 'David Gandy',
-    title: 'Masculine Dimorphism',
-    pslBadge: '9.6 PSL · TITAN JAW',
-    traitTag: 'Мощный подбородок и взгляд хищника',
-    imageUrl: '/assets/adams/david_gandy_2.jpg',
-    accentHex: '#FBBF24',
-    rgb: '251, 191, 36',
-    floatPosClass: 'top-[12%] right-[2%] rotate-6',
+    src: '/assets/adams/alain_delon.jpg',
+    className: 'bottom-[7%] left-[4%] w-48 sm:w-60 md:w-72 aspect-[4/3] rotate-3',
   },
   {
-    id: 'alain_delon',
-    name: 'Alain Delon',
-    title: 'Golden Ratio Harmony',
-    pslBadge: '9.7 PSL · CLASSIC ADAM',
-    traitTag: 'Эталонная гармония лица и скул',
-    imageUrl: '/assets/adams/alain_delon.jpg',
-    accentHex: '#10B981',
-    rgb: '16, 185, 129',
-    floatPosClass: 'bottom-[10%] right-[3%] -rotate-4',
+    src: '/assets/adams/hernan_drago.jpg',
+    className: 'bottom-[7%] right-[4%] w-44 sm:w-56 md:w-64 aspect-[3/4] -rotate-4',
   },
   {
-    id: 'hernan_drago',
-    name: 'Hernan Drago',
-    title: '120° Gonial Razor',
-    pslBadge: '9.5 PSL · HOLLOW CHEEKS',
-    traitTag: 'Впалые щёки и выдвинутая максилла',
-    imageUrl: '/assets/adams/hernan_drago.jpg',
-    accentHex: '#A855F7',
-    rgb: '168, 85, 247',
-    floatPosClass: 'top-[46%] left-[1%] rotate-2',
+    src: '/assets/adams/david_gandy_1.jpg',
+    className: 'top-[42%] left-[18%] w-40 sm:w-52 md:w-60 aspect-[3/4] -rotate-3 hidden lg:block',
   },
   {
-    id: 'gigachad',
-    name: 'GigaChad · Khalimov',
-    title: 'Absolute Sigma Canon',
-    pslBadge: '10.0 PSL · MONOLITH',
-    traitTag: 'Финальная стадия сверхчеловеческой генетики',
-    imageUrl: '/assets/loading/gigachad.gif',
-    accentHex: '#F43F5E',
-    rgb: '244, 63, 94',
-    floatPosClass: 'top-[45%] right-[1%] -rotate-3',
+    src: '/assets/perks/david_laid.gif',
+    className: 'top-[42%] right-[18%] w-40 sm:w-52 md:w-60 aspect-[3/4] rotate-3 hidden lg:block',
   },
 ];
 
-// Космические золотые и неоновые искры для фона вкладки «Поколения и ДНК»
+// Звездные искры на фоне космоса
 const COSMIC_DNA_SPARKS = [
-  { left: '8%', top: '18%', size: 4, color: '#FBBF24', delay: '0s', duration: '4.5s' },
+  { left: '8%', top: '18%', size: 3.5, color: '#FBBF24', delay: '0s', duration: '4.5s' },
   { left: '16%', top: '68%', size: 3, color: '#38BDF8', delay: '1.1s', duration: '5.2s' },
-  { left: '27%', top: '24%', size: 5, color: '#F59E0B', delay: '0.6s', duration: '4.8s' },
-  { left: '38%', top: '82%', size: 3.5, color: '#10B981', delay: '1.8s', duration: '5.5s' },
-  { left: '52%', top: '14%', size: 4.5, color: '#FBBF24', delay: '0.3s', duration: '4.2s' },
-  { left: '64%', top: '76%', size: 4, color: '#A855F7', delay: '2.2s', duration: '5.0s' },
-  { left: '78%', top: '22%', size: 5, color: '#38BDF8', delay: '0.9s', duration: '4.6s' },
+  { left: '27%', top: '24%', size: 4, color: '#F59E0B', delay: '0.6s', duration: '4.8s' },
+  { left: '38%', top: '82%', size: 3, color: '#FFFFFF', delay: '1.8s', duration: '5.5s' },
+  { left: '52%', top: '14%', size: 4, color: '#FBBF24', delay: '0.3s', duration: '4.2s' },
+  { left: '64%', top: '76%', size: 3.5, color: '#38BDF8', delay: '2.2s', duration: '5.0s' },
+  { left: '78%', top: '22%', size: 4, color: '#FFFFFF', delay: '0.9s', duration: '4.6s' },
   { left: '89%', top: '62%', size: 3.5, color: '#F59E0B', delay: '1.5s', duration: '5.4s' },
-  { left: '93%', top: '28%', size: 4, color: '#10B981', delay: '0.4s', duration: '4.9s' },
+  { left: '93%', top: '28%', size: 3, color: '#38BDF8', delay: '0.4s', duration: '4.9s' },
 ];
 
 export const GeneticsRebirthView: React.FC<RebirthViewProps> = ({
@@ -597,7 +544,6 @@ export const GeneticsRebirthView: React.FC<RebirthViewProps> = ({
   onTriggerRebirth,
   onBuyPerk,
 }) => {
-  const [focusedAdamId, setFocusedAdamId] = useState<string>('sean_opry');
   const chadliteTarget = PSL_RANKS[5].requiredLooks;
   const rebirthProgress = Math.min(
     100,
@@ -605,100 +551,53 @@ export const GeneticsRebirthView: React.FC<RebirthViewProps> = ({
   );
   const nextGenMultiplier = 1 + profile.generation * 0.4;
 
-  const focusedAdam =
-    AESTHETICS_ADAMS_PANTHEON.find((a) => a.id === focusedAdamId) ||
-    AESTHETICS_ADAMS_PANTHEON[0];
-
   return (
     <div className="relative space-y-5 select-none">
-      {/* ПОЛНОЭКРАННЫЙ ФОН ВАРИАНТ 2: КОСМИЧЕСКАЯ ТУМАННОСТЬ + СОЗВЕЗДИЕ ИСТИННЫХ АДАМОВ И ЭСТЕТИКИ */}
+      {/* ПОЛНОЭКРАННЫЙ ФОН: ЗВЕЗДНОЕ НЕБО + ЧИСТЫЕ ФОТО АДАМОВ БЕЗ НАДПИСЕЙ */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0 overflow-hidden select-none"
       >
-        {/* 1. Глубокая космическая золотисто-багровая туманность */}
+        {/* 1. Звездное небо и космическая туманность */}
         <img
           src="/assets/adams/nebula_1.jpg"
           alt=""
-          className="absolute inset-0 w-full h-full object-cover object-center scale-105 opacity-70 transition-transform duration-700"
+          className="absolute inset-0 w-full h-full object-cover object-center scale-105 opacity-75"
           style={{
-            filter: 'saturate(1.25) contrast(1.08)',
+            filter: 'saturate(1.2) contrast(1.08)',
           }}
         />
 
-        {/* 2. Крупная голографическая проекция выбранного Истинного Адама в центре космоса */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="relative w-[680px] h-[680px] rounded-full overflow-hidden opacity-25 blur-[1px] transition-all duration-500">
-            <img
-              src={focusedAdam.imageUrl}
-              alt=""
-              className="w-full h-full object-cover object-top scale-105"
-              style={{
-                maskImage:
-                  'radial-gradient(circle at 50% 42%, rgba(0,0,0,1) 18%, rgba(0,0,0,0.45) 52%, transparent 75%)',
-                WebkitMaskImage:
-                  'radial-gradient(circle at 50% 42%, rgba(0,0,0,1) 18%, rgba(0,0,0,0.45) 52%, transparent 75%)',
-              }}
-            />
-          </div>
+        {/* 2. Чистые фотографии эталонов эстетики на фоне звездного неба (без текста и подписей) */}
+        <div className="absolute inset-0">
+          {BACKGROUND_ADAMS_PHOTOS.map((photo, idx) => (
+            <div
+              key={idx}
+              className={`absolute ${photo.className} rounded-2xl overflow-hidden border border-white/15 shadow-[0_16px_40px_rgba(0,0,0,0.75)] opacity-45`}
+            >
+              <img
+                src={photo.src}
+                alt=""
+                className="w-full h-full object-cover object-top"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/20" />
+            </div>
+          ))}
         </div>
 
-        {/* 3. Парящие в космосе карточки-голограммы Адамов по бокам экрана (видны на широких и средних экранах) */}
-        <div className="hidden md:block absolute inset-0">
-          {AESTHETICS_ADAMS_PANTHEON.map((adam) => {
-            const isFocused = adam.id === focusedAdam.id;
-            return (
-              <div
-                key={`bg-float-${adam.id}`}
-                className={`absolute ${adam.floatPosClass} w-36 lg:w-44 rounded-2xl overflow-hidden border bg-slate-950/65 backdrop-blur-sm transition-all duration-500 ${
-                  isFocused ? 'opacity-65 scale-105' : 'opacity-35'
-                }`}
-                style={{
-                  borderColor: `${adam.accentHex}88`,
-                  boxShadow: `0 12px 34px rgba(0,0,0,0.75), 0 0 24px rgba(${adam.rgb}, 0.28)`,
-                }}
-              >
-                <div className="relative aspect-[4/5] w-full overflow-hidden">
-                  <img
-                    src={adam.imageUrl}
-                    alt=""
-                    className="w-full h-full object-cover object-top"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
-                  <span
-                    className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-mono font-extrabold uppercase tracking-wider text-slate-950"
-                    style={{ backgroundColor: adam.accentHex }}
-                  >
-                    {adam.pslBadge}
-                  </span>
-                  <div className="absolute bottom-1.5 left-2 right-2">
-                    <div className="text-[11px] font-extrabold text-white font-display truncate">
-                      {adam.name}
-                    </div>
-                    <div className="text-[9px] font-mono text-slate-300 truncate">
-                      {adam.title}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* 4. Космическое свечение и мягкое затемнение для идеальной читаемости текста */}
+        {/* 3. Мягкая звездная вуаль для читаемости карточек поверх фона */}
         <div
-          className="absolute inset-0 transition-all duration-500"
+          className="absolute inset-0"
           style={{
             background: `
-              radial-gradient(circle at 50% 24%, rgba(${focusedAdam.rgb}, 0.22) 0%, transparent 55%),
-              radial-gradient(circle at 15% 30%, rgba(245, 158, 11, 0.16) 0%, transparent 48%),
-              radial-gradient(circle at 85% 70%, rgba(56, 189, 248, 0.16) 0%, transparent 48%),
-              linear-gradient(180deg, rgba(8, 11, 18, 0.62) 0%, rgba(8, 11, 18, 0.42) 45%, rgba(8, 11, 18, 0.78) 100%)
+              radial-gradient(circle at 50% 30%, rgba(56, 189, 248, 0.12) 0%, transparent 55%),
+              radial-gradient(circle at 20% 70%, rgba(245, 158, 11, 0.12) 0%, transparent 50%),
+              linear-gradient(180deg, rgba(7, 10, 16, 0.55) 0%, rgba(7, 10, 16, 0.38) 50%, rgba(7, 10, 16, 0.72) 100%)
             `,
           }}
         />
 
-        {/* 5. Парящие звездные частицы ДНК */}
+        {/* 4. Мерцающие звезды */}
         {COSMIC_DNA_SPARKS.map((spark, idx) => (
           <span
             key={idx}
@@ -709,7 +608,7 @@ export const GeneticsRebirthView: React.FC<RebirthViewProps> = ({
               width: `${spark.size}px`,
               height: `${spark.size}px`,
               backgroundColor: spark.color,
-              boxShadow: `0 0 12px ${spark.color}, 0 0 22px ${spark.color}`,
+              boxShadow: `0 0 10px ${spark.color}, 0 0 20px ${spark.color}`,
               animationDelay: spark.delay,
               animationDuration: spark.duration,
             }}
@@ -717,8 +616,8 @@ export const GeneticsRebirthView: React.FC<RebirthViewProps> = ({
         ))}
       </div>
 
-      {/* ВЕРХНИЙ ЖИВОЙ БАННЕР РЕБОРНА С GIF-АНИМАЦИЕЙ И ПРОЗРАЧНЫМ СТЕКЛОМ */}
-      <div className="relative z-10 rounded-2xl border border-amber-500/45 bg-gradient-to-r from-[#171210]/85 via-[#121922]/80 to-[#0E141C]/85 backdrop-blur-md p-4 sm:p-5 overflow-hidden shadow-[0_16px_44px_rgba(0,0,0,0.65)]">
+      {/* ВЕРХНИЙ ЖИВОЙ БАННЕР РЕБОРНА С GIF-АНИМАЦИЕЙ */}
+      <div className="relative z-10 rounded-2xl border border-amber-500/45 bg-gradient-to-r from-[#171210]/80 via-[#121922]/75 to-[#0E141C]/80 backdrop-blur-md p-4 sm:p-5 overflow-hidden shadow-[0_16px_44px_rgba(0,0,0,0.65)]">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -top-20 left-1/3 w-72 h-72 rounded-full bg-amber-500/20 blur-3xl"
@@ -749,7 +648,7 @@ export const GeneticsRebirthView: React.FC<RebirthViewProps> = ({
               </div>
 
               <h2 className="text-xl sm:text-2xl font-extrabold text-white font-display tracking-tight">
-                Смена Поколения · Космический Геном Адамов
+                Смена Поколения · Новая Генетика
               </h2>
 
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs font-mono">
@@ -815,7 +714,7 @@ export const GeneticsRebirthView: React.FC<RebirthViewProps> = ({
           return (
             <div
               key={perk.id}
-              className="group relative rounded-2xl border bg-[#111821]/80 hover:bg-[#16202C]/90 backdrop-blur-md p-3.5 flex flex-col justify-between transition-all duration-200 overflow-hidden shadow-[0_12px_32px_rgba(0,0,0,0.55)]"
+              className="group relative rounded-2xl border bg-[#111821]/75 hover:bg-[#16202C]/85 backdrop-blur-md p-3.5 flex flex-col justify-between transition-all duration-200 overflow-hidden shadow-[0_12px_32px_rgba(0,0,0,0.55)]"
               style={{
                 borderColor: canAfford
                   ? meta.colorHex
@@ -905,87 +804,6 @@ export const GeneticsRebirthView: React.FC<RebirthViewProps> = ({
             </div>
           );
         })}
-      </div>
-
-      {/* ГАЛЕРЕЯ-ПАНТЕОН ИСТИННЫХ АДАМОВ И ЭСТЕТИКИ (С ВЫБОРОМ ГЛАВНОГО ЭТАЛОНА СОЗВЕЗДИЯ НА ФОНЕ) */}
-      <div className="relative z-10 rounded-2xl border border-white/15 bg-[#0D131C]/75 backdrop-blur-md p-4 sm:p-5 shadow-[0_16px_40px_rgba(0,0,0,0.6)] space-y-3.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-amber-400 font-bold">
-              <span>✨ Созвездие Эстетики · Пантеон Истинных Адамов</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-extrabold text-white font-display tracking-tight">
-              Эталоны Генетики PSL 9.5+ (Нажми на Адама, чтобы спроецировать его в космос)
-            </h3>
-          </div>
-
-          <span
-            className="px-3 py-1 rounded-full text-xs font-mono font-bold border"
-            style={{
-              color: focusedAdam.accentHex,
-              borderColor: `${focusedAdam.accentHex}55`,
-              backgroundColor: `rgba(${focusedAdam.rgb}, 0.14)`,
-            }}
-          >
-            В центре созвездия: {focusedAdam.name}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {AESTHETICS_ADAMS_PANTHEON.map((adam) => {
-            const isSelected = adam.id === focusedAdam.id;
-            return (
-              <button
-                key={adam.id}
-                type="button"
-                onClick={() => setFocusedAdamId(adam.id)}
-                className={`group relative rounded-xl overflow-hidden border text-left transition-all duration-200 cursor-pointer ${
-                  isSelected
-                    ? 'scale-[1.02] ring-2'
-                    : 'opacity-85 hover:opacity-100 hover:scale-[1.01]'
-                }`}
-                style={{
-                  borderColor: isSelected ? adam.accentHex : 'rgba(255,255,255,0.14)',
-                  boxShadow: isSelected
-                    ? `0 8px 24px rgba(${adam.rgb}, 0.35)`
-                    : '0 4px 14px rgba(0,0,0,0.45)',
-                }}
-              >
-                <div className="relative aspect-[3/4] w-full bg-slate-950 overflow-hidden">
-                  <img
-                    src={adam.imageUrl}
-                    alt={adam.name}
-                    loading="lazy"
-                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
-
-                  <span
-                    className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-mono font-extrabold uppercase tracking-wider text-slate-950 shadow"
-                    style={{ backgroundColor: adam.accentHex }}
-                  >
-                    {adam.pslBadge}
-                  </span>
-
-                  <div className="absolute bottom-2 left-2 right-2 space-y-0.5">
-                    <div className="text-xs font-extrabold text-white font-display truncate">
-                      {adam.name}
-                    </div>
-                    <div
-                      className="text-[10px] font-mono font-semibold truncate"
-                      style={{ color: adam.accentHex }}
-                    >
-                      {adam.title}
-                    </div>
-                    <div className="text-[9px] text-slate-300 line-clamp-1">
-                      {adam.traitTag}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
