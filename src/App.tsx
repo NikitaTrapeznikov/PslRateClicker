@@ -100,6 +100,7 @@ export default function App() {
   const [isAdLoading, setIsAdLoading] = useState<boolean>(false);
   const [atlasImage, setAtlasImage] = useState<HTMLImageElement | null>(null);
   const [offlineBanner, setOfflineBanner] = useState<OfflineEarningsReport | null>(null);
+  const hasCheckedArenaSoundRef = useRef<boolean>(false);
   const [rankUpBanner, setRankUpBanner] = useState<{
     rankIndex: number;
     title: string;
@@ -218,6 +219,25 @@ export default function App() {
       looksmaxMusic.setMainScreenActive(false);
     };
   }, [isMainScreenWithMusic]);
+
+  // Проверка наличия звука из плеера при первом заходе на Арену после запуска приложения:
+  // если звука нет — вызываем reloadPlayer() ровно 1 раз без уведомлений
+  useEffect(() => {
+    if (isInitialLoading || activeSection !== 'arena' || hasCheckedArenaSoundRef.current) {
+      return;
+    }
+    hasCheckedArenaSoundRef.current = true;
+
+    const timerId = window.setTimeout(() => {
+      if (!looksmaxMusic.isAudioActuallyPlaying()) {
+        looksmaxMusic.reloadPlayer();
+      }
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [isInitialLoading, activeSection]);
 
   // 2.5. Генератор случайных интерактивных бонус-мишеней на стекле Умного Зеркала
   useEffect(() => {

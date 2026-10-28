@@ -302,6 +302,8 @@ class DualDeckCrossfadeController {
           })
           .catch(() => {
             // Браузер может ждать первого клика по странице
+            this.isPlaying = false;
+            this.notify();
           });
       }
     };
@@ -865,11 +867,32 @@ class DualDeckCrossfadeController {
         this.syncPhysicalVolumes();
         this.applyPlaybackRateToDeck(activeDeck);
         if (activeDeck.paused) {
-          activeDeck.play().catch(() => {});
+          activeDeck.play().catch(() => {
+            this.isPlaying = false;
+            this.notify();
+          });
         }
       }
     }
     this.notify();
+  }
+
+  /**
+   * Простая проверка физического наличия звука из плеера в данный момент:
+   * активная дека реально воспроизводит аудио (не на паузе, громкость > 0, буфер готов, время > 0).
+   */
+  public isAudioActuallyPlaying(): boolean {
+    const active = this.getActiveDeck();
+    if (!active) return false;
+    return (
+      this.isMainScreenActive &&
+      !active.paused &&
+      !active.ended &&
+      !active.muted &&
+      active.volume > 0 &&
+      active.readyState >= 2 &&
+      active.currentTime > 0
+    );
   }
 
   /**
