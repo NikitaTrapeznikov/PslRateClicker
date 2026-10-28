@@ -60,3 +60,34 @@
 .animate-bounce-subtle {
   animation: bounceSubtle 1.8s ease-in-out infinite;
 }
+
+@keyframes auraRingExpand {
+  0% {
+    transform: scale(0.88);
+    opacity: 0.78;
+  }
+  100% {
+    transform: scale(1.36);
+    opacity: 0;
+  }
+}
+
+.animate-aura-ring {
+  animation: auraRingExpand 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sigmaOverdrivePulse {
+  0%, 100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+.animate-sigma-overdrive {
+  animation: sigmaOverdrivePulse 1.2s ease-in-out infinite;
+}
+

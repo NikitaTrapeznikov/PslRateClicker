@@ -12,6 +12,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ARENA_LOCATIONS,
+  ArenaLocationTier,
+  ArenaStageBackground,
+  getLocationTierByRankIndex,
+} from './components/ArenaStageBackground';
+import {
   EvolutionAtlasView,
   GeneticsRebirthView,
   LeaderboardAndBalanceView,
@@ -91,12 +97,23 @@ export default function App() {
     title: string;
     subtitle: string;
   } | null>(null);
+  const [auraWaves, setAuraWaves] = useState<Array<{ id: number; isCrit: boolean }>>([]);
+  const [arenaLocationOverride, setArenaLocationOverride] = useState<'auto' | ArenaLocationTier>('auto');
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<PSLSpriteRenderer | null>(null);
   const profileRef = useRef<PlayerProfileData>(profile);
   const comboRef = useRef<number>(mewingCombo);
   const auraFrenzyRef = useRef<number>(auraFrenzyRemainingSec);
+  const nextWaveIdRef = useRef<number>(1);
+
+  const spawnAuraWave = useCallback((isCrit: boolean) => {
+    const waveId = nextWaveIdRef.current++;
+    setAuraWaves((prev) => [...prev.slice(-4), { id: waveId, isCrit }]);
+    window.setTimeout(() => {
+      setAuraWaves((prev) => prev.filter((w) => w.id !== waveId));
+    }, 680);
+  }, []);
 
   useEffect(() => {
     profileRef.current = profile;
@@ -398,6 +415,7 @@ export default function App() {
         hasHammerUpgrade: hasHammer,
       });
 
+      spawnAuraWave(isCrit);
       setMewingCombo((prev) => Math.min(100, prev + 8.5));
 
       setProfile((prev) => {
@@ -665,6 +683,7 @@ export default function App() {
       });
 
       setMirrorTarget(null);
+      spawnAuraWave(true);
       setMewingCombo(100);
       setAuraFrenzyRemainingSec((prev) => Math.min(30, prev + 12));
 
@@ -719,10 +738,89 @@ export default function App() {
     );
   }
 
+  const activeGlowRgb =
+    auraFrenzyRemainingSec > 0 ? '251, 191, 36' : mirrorLedPalette.rgb;
+  const activeGlowHex =
+    auraFrenzyRemainingSec > 0 ? '#FBBF24' : mirrorLedPalette.accentHex;
+
+  const autoLocationTier = getLocationTierByRankIndex(stats.currentRank.index);
+  const activeArenaTier: ArenaLocationTier =
+    arenaLocationOverride === 'auto' ? autoLocationTier : arenaLocationOverride;
+  const activeLocationMeta = ARENA_LOCATIONS[activeArenaTier];
+
   return (
-    <div className="min-h-screen bg-[#0F1419] text-[#F1F5F9] flex flex-col">
+    <div
+      className="relative min-h-screen bg-[#0B0F14] text-[#F1F5F9] flex flex-col overflow-x-hidden transition-colors duration-300"
+      style={
+        activeSection === 'arena'
+          ? {
+              backgroundImage: `
+                radial-gradient(circle at 50% 38%, rgba(${activeGlowRgb}, ${(
+                  0.12 +
+                  comboRatio * 0.24 +
+                  (isPeakAura ? 0.1 : 0)
+                ).toFixed(2)}) 0%, transparent 58%),
+                radial-gradient(circle at 18% 75%, rgba(16, 185, 129, ${(
+                  0.07 +
+                  comboRatio * 0.14
+                ).toFixed(2)}) 0%, transparent 48%),
+                radial-gradient(circle at 82% 72%, rgba(56, 189, 248, ${(
+                  0.07 +
+                  comboRatio * 0.14
+                ).toFixed(2)}) 0%, transparent 48%)
+              `,
+            }
+          : undefined
+      }
+    >
+      {/* ТОЛЬКО ДЛЯ АРЕНЫ ПРОКАЧКИ: Сменяемый фон окружения + экранный эффект «Поток Сигмы» */}
+      {activeSection === 'arena' && (
+        <>
+          <ArenaStageBackground
+            tier={activeArenaTier}
+            comboRatio={comboRatio}
+            isPeakAura={isPeakAura}
+          />
+
+          {/* ЭКРАННЫЙ ЭФФЕКТ «ПОТОК СИГМЫ» (OVERDRIVE): Неоновая виньетка по краям экрана только на Арене */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed inset-0 z-40 transition-all duration-150"
+            style={{
+              boxShadow:
+                comboRatio > 0.08 || isPeakAura
+                  ? `inset 0 0 ${Math.round(35 + comboRatio * 85 + (isPeakAura ? 30 : 0))}px rgba(${activeGlowRgb}, ${(
+                      comboRatio * 0.34 +
+                      (isPeakAura ? 0.16 : 0)
+                    ).toFixed(2)})`
+                  : 'none',
+            }}
+          >
+            {/* Верхняя и нижняя плазменные линии на пике комбо (Overdrive) */}
+            {isPeakAura && (
+              <>
+                <div
+                  className="absolute top-0 left-0 right-0 h-[3px] animate-sigma-overdrive"
+                  style={{
+                    background: `linear-gradient(90deg, transparent 5%, ${activeGlowHex} 50%, transparent 95%)`,
+                    boxShadow: `0 0 20px ${activeGlowHex}`,
+                  }}
+                />
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-[3px] animate-sigma-overdrive"
+                  style={{
+                    background: `linear-gradient(90deg, transparent 5%, ${activeGlowHex} 50%, transparent 95%)`,
+                    boxShadow: `0 0 20px ${activeGlowHex}`,
+                  }}
+                />
+              </>
+            )}
+          </div>
+        </>
+      )}
+
       {/* Top Bar Contract: 3 зоны с разделением gap-8 */}
-      <header className="flex items-center justify-between gap-8 px-6 py-3.5 border-b border-[#2A343D] bg-[#141B21]">
+      <header className="relative z-10 flex items-center justify-between gap-8 px-6 py-3.5 border-b border-[#2A343D] bg-[#141B21]/90 backdrop-blur-md">
         {/* Zone 1: Brand Wordmark */}
         <button
           type="button"
@@ -885,7 +983,7 @@ export default function App() {
       )}
 
       {/* Основной контейнер 1440px */}
-      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 py-5">
+      <main className="relative z-10 flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 py-5">
         {activeSection === 'arena' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
             {/* ЛЕВАЯ КОЛОНКА (Col 1–3): Только проигрыватель со сворачиванием в мини-версию */}
@@ -893,10 +991,103 @@ export default function App() {
               <LooksmaxMusicPlayer />
             </div>
 
-            {/* ЦЕНТРАЛЬНАЯ КОЛОНКА (Col 4–7): Умное зеркало (Smart Mirror) с живой LED-подсветкой и бонус-мишенями */}
-            <div className="lg:col-span-5 flex flex-col gap-4">
+            {/* ЦЕНТРАЛЬНАЯ КОЛОНКА (Col 4–7): Умное зеркало (Smart Mirror) с живой LED-подсветкой, световыми кольцами Потока Сигмы и бонус-мишенями */}
+            <div className="lg:col-span-5 flex flex-col gap-3 relative">
+              {/* Компактная плашка текущей локации фона Арены с мини-превью картинок */}
+              <div className="relative z-10 px-3 py-2 rounded-2xl bg-[#111820]/85 backdrop-blur-md border border-white/15 flex flex-wrap items-center justify-between gap-2 shadow-lg">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className="w-8 h-5 rounded-md overflow-hidden border shrink-0"
+                    style={{
+                      borderColor: activeLocationMeta.accentHex,
+                      boxShadow: `0 0 8px ${activeLocationMeta.accentHex}55`,
+                    }}
+                  >
+                    <img
+                      src={activeLocationMeta.imageUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-xs font-bold text-white truncate">
+                      {activeLocationMeta.title}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">
+                      ({activeLocationMeta.ranksLabel})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setArenaLocationOverride('auto')}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-colors cursor-pointer ${
+                      arenaLocationOverride === 'auto'
+                        ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                        : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                    }`}
+                    title="Менять фон автоматически по текущему рангу"
+                  >
+                    АВТО
+                  </button>
+                  {ARENA_LOCATIONS.map((loc) => {
+                    const isSelected = arenaLocationOverride === loc.tier;
+                    const isCurrentEffective = activeArenaTier === loc.tier;
+                    return (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => setArenaLocationOverride(loc.tier)}
+                        className={`relative w-8 h-6 rounded-lg overflow-hidden border transition-all cursor-pointer flex items-center justify-center ${
+                          isSelected
+                            ? 'scale-105 ring-2 ring-white/80'
+                            : isCurrentEffective
+                            ? 'opacity-95'
+                            : 'opacity-65 hover:opacity-100'
+                        }`}
+                        style={{
+                          borderColor:
+                            isSelected || isCurrentEffective
+                              ? loc.accentHex
+                              : 'rgba(255,255,255,0.2)',
+                        }}
+                        title={`${loc.title} (${loc.ranksLabel})`}
+                      >
+                        <img
+                          src={loc.imageUrl}
+                          alt=""
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                        <span className="relative z-10 text-[10px] font-mono font-extrabold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)] bg-black/45 px-1 rounded">
+                          {loc.tier + 1}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Мягкое круговое свечение за зеркалом (без квадратных рамок) */}
               <div
-                className="relative rounded-[32px] p-[6px] bg-gradient-to-b from-[#475569] via-[#1E293B] to-[#0F172A] transition-shadow duration-200 flex-1 flex flex-col"
+                aria-hidden="true"
+                className="pointer-events-none absolute -inset-8 z-0 flex items-center justify-center"
+              >
+                <div
+                  className="w-full h-full rounded-full blur-3xl transition-opacity duration-200"
+                  style={{
+                    background: `radial-gradient(circle, rgba(${activeGlowRgb}, ${(
+                      0.14 +
+                      comboRatio * 0.28 +
+                      (isPeakAura ? 0.12 : 0)
+                    ).toFixed(2)}) 0%, transparent 70%)`,
+                  }}
+                />
+              </div>
+
+              <div
+                className="relative z-10 rounded-[32px] p-[6px] bg-gradient-to-b from-[#475569] via-[#1E293B] to-[#0F172A] transition-shadow duration-200 flex-1 flex flex-col"
                 style={{ boxShadow: mirrorOuterShadow }}
               >
                 {/* Верхняя диодная LED-полоса ранга и пикового тонуса */}
@@ -1823,6 +2014,7 @@ export default function App() {
           <GeneticsRebirthView
             profile={profile}
             stats={stats}
+            atlasImage={atlasImage}
             onTriggerRebirth={handleTriggerRebirth}
             onBuyPerk={handleBuyDnaPerk}
           />

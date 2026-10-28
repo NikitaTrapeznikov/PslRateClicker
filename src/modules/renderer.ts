@@ -356,27 +356,13 @@ export class PSLSpriteRenderer {
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Тонкая антропометрическая разметка золотого сечения на фоне
-    this.drawAnthropometricGrid(ctx, width, height, rank.index, perkLevels);
-
-    // 3. Отрисовка HD-портрета с легким реалистичным объемом и зацикленной анимацией при удержании бонуса
+    // 2. Отрисовка HD-портрета с упругим откликом при нажатии и шейком при крите (без квадратных полос и сеток)
     const centerX = width / 2 + this.shakeOffsetX;
     const centerY = height / 2 + this.shakeOffsetY;
 
     ctx.save();
     ctx.translate(centerX, centerY);
-
-    // При активном бонусе от нажатия добавляется плавный 2.5D-наклон головы и дыхательный ритм
-    const headTilt =
-      Math.sin(this.loopPhase) * animProfile.headTiltRad * this.loopAmplitude;
-    const breathScaleY =
-      1 + Math.sin(this.loopPhase * 0.85) * (animProfile.breathAmp * 0.45) * this.loopAmplitude;
-    const breathOffsetY =
-      Math.cos(this.loopPhase * 0.85) * 3.2 * this.loopAmplitude;
-
-    ctx.translate(0, breathOffsetY);
-    ctx.rotate(headTilt);
-    ctx.scale(this.scalePulse, this.scalePulse * breathScaleY);
+    ctx.scale(this.scalePulse, this.scalePulse);
 
     const targetBoxSize = Math.min(width, height) * 0.84;
 
@@ -395,38 +381,23 @@ export class PSLSpriteRenderer {
         drawW = targetBoxSize * aspect;
       }
 
-      this.drawEnhancedAnimatedPortrait(
-        ctx,
+      ctx.drawImage(
         this.atlasImage,
         sx,
         sy,
         sw,
         sh,
+        -drawW / 2,
+        -drawH / 2,
         drawW,
-        drawH,
-        rank.index,
-        animProfile
+        drawH
       );
     } else {
       // Фоллбэк-силуэт на время загрузки текстуры
       this.drawFallbackSilhouette(ctx, targetBoxSize, rank);
     }
 
-    // 4. Визуальные маркеры открытых наследственных перков ДНК (Hunter Eyes / Угол челюсти 120°)
-    this.drawGeneticTraitOverlays(ctx, targetBoxSize, perkLevels, generation);
-
     ctx.restore();
-
-    // 5. Индикатор комбо-ритма мьюинга по периметру рамки
-    if (mewingCombo > 5 || rewardedBoostActive) {
-      ctx.save();
-      ctx.strokeStyle = rewardedBoostActive
-        ? 'rgba(245, 158, 11, 0.55)'
-        : 'rgba(16, 185, 129, 0.45)';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(2, 2, width - 4, height - 4);
-      ctx.restore();
-    }
 
     // 6. Отрисовка ударных волн (Shockwaves)
     for (let i = this.shockwaves.length - 1; i >= 0; i--) {
