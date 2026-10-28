@@ -29,6 +29,16 @@ import {
 } from './components/MarketplacePhoneShop';
 import { LooksmaxMusicPlayer } from './components/LooksmaxMusicPlayer';
 import { LooksmaxLoadingScreen } from './components/LooksmaxLoadingScreen';
+import {
+  loadTutorialTapsState,
+  saveTutorialTapsState,
+  TutorialTapHand,
+  TutorialTapsState,
+} from './components/TutorialTapHand';
+import {
+  PlayerProfileHeaderButton,
+  PlayerProfileModal,
+} from './components/PlayerProfileModal';
 import { looksmaxMusic } from './modules/musicPlayer';
 import {
   calculateItemCost,
@@ -97,6 +107,19 @@ export default function App() {
   } | null>(null);
   const [auraWaves, setAuraWaves] = useState<Array<{ id: number; isCrit: boolean }>>([]);
   const [arenaLocationOverride, setArenaLocationOverride] = useState<'auto' | ArenaLocationTier>('auto');
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [tutorialTaps, setTutorialTaps] = useState<TutorialTapsState>(() =>
+    loadTutorialTapsState()
+  );
+
+  const markTutorialTapped = useCallback((key: keyof TutorialTapsState) => {
+    setTutorialTaps((prev) => {
+      if (prev[key]) return prev;
+      const next = { ...prev, [key]: true };
+      saveTutorialTapsState(next);
+      return next;
+    });
+  }, []);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<PSLSpriteRenderer | null>(null);
@@ -390,6 +413,8 @@ export default function App() {
       const canvas = canvasRef.current;
       if (!canvas) return;
 
+      markTutorialTapped('mirror');
+
       const rect = canvas.getBoundingClientRect();
       const normX = Math.max(0.1, Math.min(0.9, (e.clientX - rect.left) / rect.width));
       const normY = Math.max(0.1, Math.min(0.9, (e.clientY - rect.top) / rect.height));
@@ -457,7 +482,7 @@ export default function App() {
         };
       });
     },
-    [stats, profile.itemLevels]
+    [stats, profile.itemLevels, markTutorialTapped]
   );
 
   // Покупка предмета в магазине (Ручной клик / Пассивные мази и операции)
@@ -552,6 +577,7 @@ export default function App() {
 
   // Активация буста x2 за просмотр Rewarded-рекламы Яндекс Игр
   const handleActivateRewardedBoost = useCallback(() => {
+    markTutorialTapped('rewardedAd');
     if (isAdLoading) return;
     profileManager.showRewardedAdForBoost(
       () => {
@@ -567,7 +593,7 @@ export default function App() {
       },
       (busy) => setIsAdLoading(busy)
     );
-  }, [isAdLoading]);
+  }, [isAdLoading, markTutorialTapped]);
 
   // Переключение режима подписи из оригинального атласа
   const handleToggleOriginalCaption = useCallback(() => {
@@ -579,6 +605,37 @@ export default function App() {
       profileManager.saveProfileAsync(updated, false);
       return updated;
     });
+  }, []);
+
+  // Полный сброс профиля с возвратом на стадию Sub 3
+  const handleResetProfile = useCallback(() => {
+    const fresh = profileManager.resetAllProgress();
+    setProfile(fresh);
+    setMewingCombo(0);
+    setAuraFrenzyRemainingSec(0);
+    setMirrorTarget(null);
+    setOfflineBanner(null);
+    setRankUpBanner(null);
+    setActiveSection('arena');
+  }, []);
+
+  // Принудительное сохранение профиля из окна Профиля
+  const handleForceSaveProfile = useCallback(() => {
+    profileManager.saveProfileAsync(profileRef.current, true);
+  }, []);
+
+  // Повторное включение пальцев-подсказок обучения
+  const handleResetTutorialHints = useCallback(() => {
+    const resetState: TutorialTapsState = {
+      mirror: false,
+      playerGif: false,
+      phoneFlip: false,
+      evolutionTab: false,
+      rebirthTab: false,
+      rewardedAd: false,
+    };
+    setTutorialTaps(resetState);
+    saveTutorialTapsState(resetState);
   }, []);
 
   const filteredShopItems = useMemo(
@@ -834,35 +891,53 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveSection('evolution')}
-            className={`px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
+            onClick={() => {
+              markTutorialTapped('evolutionTab');
+              setActiveSection('evolution');
+            }}
+            className={`relative px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
               activeSection === 'evolution'
                 ? 'bg-emerald-500/20 text-white border-emerald-400/60 shadow-[0_0_16px_rgba(16,185,129,0.25)]'
                 : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10 hover:text-white'
             }`}
           >
             Эволюция PSL (8 стадий)
+            {!tutorialTaps.evolutionTab && (
+              <TutorialTapHand
+                size="sm"
+                className="absolute -bottom-6 left-1/2 -translate-x-1/2"
+              />
+            )}
           </button>
           <button
             type="button"
-            onClick={() => setActiveSection('rebirth')}
-            className={`px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
+            onClick={() => {
+              markTutorialTapped('rebirthTab');
+              setActiveSection('rebirth');
+            }}
+            className={`relative px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
               activeSection === 'rebirth'
                 ? 'bg-amber-500/25 text-amber-300 border-amber-400/70 shadow-[0_0_16px_rgba(245,158,11,0.3)]'
                 : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10 hover:text-white'
             }`}
           >
             Поколения и ДНК {stats.canRebirth ? `(+${stats.pendingRebirthDNA})` : ''}
+            {!tutorialTaps.rebirthTab && (
+              <TutorialTapHand
+                size="sm"
+                className="absolute -bottom-6 left-1/2 -translate-x-1/2"
+              />
+            )}
           </button>
         </nav>
 
-        {/* Zone 3: 1 основное действие (Rewarded Boost Яндекс Игр) */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Zone 3: Rewarded Boost Яндекс Игр + Кнопка-иконка Профиля игрока */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={handleActivateRewardedBoost}
             disabled={isAdLoading}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`relative px-4 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               profile.rewardedBoostRemainingSec > 0
                 ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
                 : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
@@ -873,7 +948,20 @@ export default function App() {
               : profile.rewardedBoostRemainingSec > 0
               ? `Буст ×2 активен (${formatDuration(profile.rewardedBoostRemainingSec)})`
               : 'Буст ×2 за рекламу'}
+            {!tutorialTaps.rewardedAd && (
+              <TutorialTapHand
+                size="sm"
+                className="absolute -bottom-6 left-1/2 -translate-x-1/2"
+              />
+            )}
           </button>
+
+          <PlayerProfileHeaderButton
+            profile={profile}
+            stats={stats}
+            atlasImage={atlasImage}
+            onClick={() => setIsProfileModalOpen(true)}
+          />
         </div>
       </header>
 
@@ -892,25 +980,43 @@ export default function App() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveSection('evolution')}
-          className={`py-2 px-2 rounded-lg text-xs font-semibold whitespace-nowrap truncate border ${
+          onClick={() => {
+            markTutorialTapped('evolutionTab');
+            setActiveSection('evolution');
+          }}
+          className={`relative py-2 px-2 rounded-lg text-xs font-semibold whitespace-nowrap truncate border ${
             activeSection === 'evolution'
               ? 'bg-emerald-500/20 text-white border-emerald-400/60'
               : 'bg-white/5 text-slate-200 border-white/10'
           }`}
         >
           8 стадий
+          {!tutorialTaps.evolutionTab && (
+            <TutorialTapHand
+              size="sm"
+              className="absolute -bottom-5 left-1/2 -translate-x-1/2"
+            />
+          )}
         </button>
         <button
           type="button"
-          onClick={() => setActiveSection('rebirth')}
-          className={`py-2 px-2 rounded-lg text-xs font-semibold whitespace-nowrap truncate border ${
+          onClick={() => {
+            markTutorialTapped('rebirthTab');
+            setActiveSection('rebirth');
+          }}
+          className={`relative py-2 px-2 rounded-lg text-xs font-semibold whitespace-nowrap truncate border ${
             activeSection === 'rebirth'
               ? 'bg-amber-500/25 text-amber-300 border-amber-400/70'
               : 'bg-white/5 text-slate-200 border-white/10'
           }`}
         >
           Реборн
+          {!tutorialTaps.rebirthTab && (
+            <TutorialTapHand
+              size="sm"
+              className="absolute -bottom-5 left-1/2 -translate-x-1/2"
+            />
+          )}
         </button>
       </div>
 
@@ -971,7 +1077,10 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
             {/* ЛЕВАЯ КОЛОНКА (Col 1–3): Только проигрыватель со сворачиванием в мини-версию */}
             <div className="lg:col-span-3 flex flex-col">
-              <LooksmaxMusicPlayer />
+              <LooksmaxMusicPlayer
+                showGifTutorialHand={!tutorialTaps.playerGif}
+                onDismissGifTutorialHand={() => markTutorialTapped('playerGif')}
+              />
             </div>
 
             {/* ЦЕНТРАЛЬНАЯ КОЛОНКА (Col 4–7): Умное зеркало (Smart Mirror) с живой LED-подсветкой, световыми кольцами Потока Сигмы и бонус-мишенями */}
@@ -1099,6 +1208,15 @@ export default function App() {
                     onPointerDown={handleStagePointerDown}
                     className="absolute inset-0 w-full h-full block cursor-pointer touch-none"
                   />
+
+                  {/* Полупрозрачный палец подсказки при первом входе: клик по зеркалу */}
+                  {!tutorialTaps.mirror && (
+                    <TutorialTapHand
+                      size="lg"
+                      label="Тапай зеркало"
+                      className="absolute top-[54%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-30"
+                    />
+                  )}
 
                   {/* Зеркальные блики, градиент стекла и контурное свечение умного зеркала */}
                   <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(226,232,240,0.45)_0%,rgba(255,255,255,0)_38%,rgba(255,255,255,0.32)_52%,rgba(203,213,225,0.25)_100%)]" />
@@ -1249,6 +1367,8 @@ export default function App() {
                 filteredShopItems={filteredShopItems}
                 bestRoiItemId={bestRoiItemId}
                 onBuyShopItem={handleBuyShopItem}
+                showPhoneFlipTutorialHand={!tutorialTaps.phoneFlip}
+                onDismissPhoneFlipTutorialHand={() => markTutorialTapped('phoneFlip')}
               />
             </div>
           </div>
@@ -1273,6 +1393,19 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Модальное окно Профиля игрока (статистика, настройки, сброс прогресса) */}
+      <PlayerProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        profile={profile}
+        stats={stats}
+        atlasImage={atlasImage}
+        onResetProfile={handleResetProfile}
+        onToggleOriginalCaption={handleToggleOriginalCaption}
+        onForceSaveProfile={handleForceSaveProfile}
+        onResetTutorialHints={handleResetTutorialHints}
+      />
     </div>
   );
 }

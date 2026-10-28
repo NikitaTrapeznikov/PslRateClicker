@@ -19,6 +19,7 @@ import {
   pickPhraseByTone,
   rollMessageToneForRank,
 } from './PhoneMessengerApp';
+import { TutorialTapHand } from './TutorialTapHand';
 import { UpgradeSketchArt } from './UpgradeSketchArt';
 
 export type BuyMultiplierMode = 1 | 10 | 'MAX';
@@ -35,6 +36,8 @@ export interface MarketplacePhoneShopProps {
   filteredShopItems: ShopItemDefinition[];
   bestRoiItemId: string | null;
   onBuyShopItem: (item: ShopItemDefinition) => void;
+  showPhoneFlipTutorialHand?: boolean;
+  onDismissPhoneFlipTutorialHand?: () => void;
 }
 
 function getCurrentTimeHHMM(): string {
@@ -55,7 +58,16 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
   filteredShopItems,
   bestRoiItemId,
   onBuyShopItem,
+  showPhoneFlipTutorialHand = false,
+  onDismissPhoneFlipTutorialHand,
 }) => {
+  const handleFlipPhone = useCallback(
+    (minimized: boolean) => {
+      setIsShopMinimized(minimized);
+      onDismissPhoneFlipTutorialHand?.();
+    },
+    [setIsShopMinimized, onDismissPhoneFlipTutorialHand]
+  );
   const [activePhoneApp, setActivePhoneApp] = useState<PhoneAppId>(() =>
     shopCategory === 'click' ? 'ozon' : 'wb'
   );
@@ -434,7 +446,7 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
                 {/* Dynamic Island с объективом фронтальной камеры и датчиком */}
                 <button
                   type="button"
-                  onClick={() => setIsShopMinimized(true)}
+                  onClick={() => handleFlipPhone(true)}
                   title="Перевернуть смартфон задней крышкой"
                   className="group relative h-[22px] w-[104px] rounded-full bg-black px-2.5 flex items-center justify-between shadow-[0_2px_8px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.08)] cursor-pointer transition-transform duration-200 hover:scale-105"
                 >
@@ -448,6 +460,12 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
                   <span className="relative w-3 h-3 rounded-full bg-gradient-to-br from-[#192847] via-[#070B14] to-[#1E1B4B] ring-1 ring-white/15 flex items-center justify-center">
                     <span className="w-1 h-1 rounded-full bg-sky-400/70 blur-[0.3px]" />
                   </span>
+                  {showPhoneFlipTutorialHand && !isShopMinimized && (
+                    <TutorialTapHand
+                      size="sm"
+                      className="absolute -bottom-6 left-1/2 -translate-x-1/2"
+                    />
+                  )}
                 </button>
 
                 {/* Иконки сети 5G, Wi-Fi и заряда батареи */}
@@ -538,7 +556,7 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
                   <div className="bg-[#17212B] pt-2 pb-1.5 flex flex-col items-center justify-center">
                     <button
                       type="button"
-                      onClick={() => setIsShopMinimized(true)}
+                      onClick={() => handleFlipPhone(true)}
                       title="Свернуть и перевернуть задней крышкой"
                       className="group py-1 px-6 cursor-pointer flex items-center justify-center"
                     >
@@ -649,10 +667,17 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => setIsShopMinimized(true)}
-                          className="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-950/35 text-white/90 hover:bg-slate-950/55 border border-white/20 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                          onClick={() => handleFlipPhone(true)}
+                          className="relative px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-950/35 text-white/90 hover:bg-slate-950/55 border border-white/20 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                         >
                           Свернуть
+                          {showPhoneFlipTutorialHand && !isShopMinimized && (
+                            <TutorialTapHand
+                              size="sm"
+                              label="Перевернуть"
+                              className="absolute -bottom-9 left-1/2 -translate-x-1/2"
+                            />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -864,7 +889,7 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
                     <div className="pt-3 pb-0.5 flex flex-col items-center justify-center">
                       <button
                         type="button"
-                        onClick={() => setIsShopMinimized(true)}
+                        onClick={() => handleFlipPhone(true)}
                         title="Свернуть и перевернуть задней крышкой"
                         className="group py-1 px-6 cursor-pointer flex items-center justify-center"
                       >
@@ -882,13 +907,13 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
         {/* ЗАДНЯЯ КРЫШКА (BACK FACE): Реалистичный 1:1 Оранжевый iPhone 17 Pro   */}
         {/* ===================================================================== */}
         <div
-          onClick={() => setIsShopMinimized(false)}
+          onClick={() => handleFlipPhone(false)}
           role="button"
           tabIndex={isShopMinimized ? 0 : -1}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              setIsShopMinimized(false);
+              handleFlipPhone(false);
             }
           }}
           className={`absolute inset-0 w-full h-full rounded-[48px] p-[10px] bg-gradient-to-br from-[#F47133] via-[#DF5618] to-[#9E3407] shadow-[0_28px_65px_rgba(0,0,0,0.75),0_0_34px_rgba(234,88,28,0.26),inset_0_2px_3px_rgba(255,204,170,0.8),inset_0_-3px_6px_rgba(70,19,2,0.9)] border border-[#FFA06A]/55 flex flex-col justify-between overflow-hidden cursor-pointer group ${
@@ -1039,10 +1064,17 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setIsShopMinimized(false)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-[#FF7A3D] to-[#E04F10] hover:brightness-110 text-white shadow-[0_4px_12px_rgba(224,79,16,0.45)] border border-[#FFB58F]/40 transition-all whitespace-nowrap shrink-0 cursor-pointer"
+                  onClick={() => handleFlipPhone(false)}
+                  className="relative px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-[#FF7A3D] to-[#E04F10] hover:brightness-110 text-white shadow-[0_4px_12px_rgba(224,79,16,0.45)] border border-[#FFB58F]/40 transition-all whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   На экран ↻
+                  {showPhoneFlipTutorialHand && isShopMinimized && (
+                    <TutorialTapHand
+                      size="sm"
+                      label="Перевернуть"
+                      className="absolute -top-10 left-1/2 -translate-x-1/2"
+                    />
+                  )}
                 </button>
               </div>
 

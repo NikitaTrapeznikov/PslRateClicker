@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { LOOKSMAX_PLAYLIST, looksmaxMusic } from '../modules/musicPlayer';
+import { TutorialTapHand } from './TutorialTapHand';
 
 function formatAudioTime(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return '0:00';
@@ -43,10 +44,27 @@ const LOOKSMAX_DANCERS: LooksmaxDancerGif[] = [
   },
 ];
 
-export const LooksmaxMusicPlayer: React.FC = () => {
+interface LooksmaxMusicPlayerProps {
+  showGifTutorialHand?: boolean;
+  onDismissGifTutorialHand?: () => void;
+}
+
+export const LooksmaxMusicPlayer: React.FC<LooksmaxMusicPlayerProps> = ({
+  showGifTutorialHand = false,
+  onDismissGifTutorialHand,
+}) => {
   const [, setTick] = useState(0);
   const [isMinimized, setIsMinimized] = useState(true);
   const [dancerIndex, setDancerIndex] = useState(0);
+  const [isReloading, setIsReloading] = useState(false);
+
+  const handleReloadPlayer = () => {
+    setIsReloading(true);
+    looksmaxMusic.reloadPlayer();
+    window.setTimeout(() => {
+      setIsReloading(false);
+    }, 650);
+  };
 
   useEffect(() => {
     return looksmaxMusic.subscribe(() => {
@@ -72,9 +90,10 @@ export const LooksmaxMusicPlayer: React.FC = () => {
   if (isMinimized) {
     return (
       <div
-        onClick={() =>
-          setDancerIndex((prev) => (prev + 1) % LOOKSMAX_DANCERS.length)
-        }
+        onClick={() => {
+          setDancerIndex((prev) => (prev + 1) % LOOKSMAX_DANCERS.length);
+          onDismissGifTutorialHand?.();
+        }}
         title="Нажмите на гифку, чтобы сменить танец"
         className="relative w-full max-w-[320px] mx-auto aspect-[320/420] rounded-xl border border-[#2A343D] bg-[#0F1419] overflow-hidden flex flex-col justify-end shadow-lg cursor-pointer select-none"
       >
@@ -96,6 +115,15 @@ export const LooksmaxMusicPlayer: React.FC = () => {
           ))}
         </div>
 
+        {/* Полупрозрачный палец подсказки при первом входе: клик по гифке меняет танцора */}
+        {showGifTutorialHand && (
+          <TutorialTapHand
+            size="md"
+            label="Тык по гифке"
+            className="absolute top-[36%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-30"
+          />
+        )}
+
         {/* Легкое затемнение снизу для контраста мини-плеера поверх оригинального видеофона */}
         <div
           className="absolute inset-0 z-10 pointer-events-none"
@@ -114,20 +142,37 @@ export const LooksmaxMusicPlayer: React.FC = () => {
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-mono text-emerald-400 truncate">
                 Мини-плеер · {currentIndex + 1}/{LOOKSMAX_PLAYLIST.length}
-                {isCrossfading ? ' · Переход...' : ''}
+                {isReloading
+                  ? ' · Перезапуск...'
+                  : isCrossfading
+                  ? ' · Переход...'
+                  : ''}
               </div>
               <div className="text-sm font-semibold text-[#F1F5F9] font-display truncate">
                 {currentTrack.title}
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsMinimized(false)}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0F1419] hover:bg-[#222C34] text-[#F1F5F9] border border-[#2A343D] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              Развернуть
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={handleReloadPlayer}
+                title="Перезапустить плеер (если звук завис или не играет)"
+                className="px-2 py-1.5 rounded-lg text-xs font-mono font-bold bg-[#0F1419] hover:bg-emerald-500/20 text-emerald-400 border border-[#2A343D] hover:border-emerald-500/50 transition-colors shrink-0 cursor-pointer flex items-center gap-1"
+              >
+                <span className={isReloading ? 'inline-block animate-spin' : 'inline-block'}>
+                  ↻
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMinimized(false)}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#0F1419] hover:bg-[#222C34] text-[#F1F5F9] border border-[#2A343D] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Развернуть
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between gap-2 pt-1">
@@ -189,6 +234,18 @@ export const LooksmaxMusicPlayer: React.FC = () => {
         </h2>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleReloadPlayer}
+            title="Перезапустить плеер"
+            className="px-2 py-1 rounded text-[11px] font-mono font-semibold bg-[#0F1419] text-emerald-400 border border-[#2A343D] hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1"
+          >
+            <span className={isReloading ? 'inline-block animate-spin' : 'inline-block'}>
+              ↻
+            </span>
+            <span>Reload</span>
+          </button>
+
           <button
             type="button"
             onClick={() => looksmaxMusic.toggleLoopSingle()}

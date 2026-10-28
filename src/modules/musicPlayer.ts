@@ -282,8 +282,8 @@ class DualDeckCrossfadeController {
       }
       if (!active) return;
 
-      if (!active.src) {
-        this.prepareDeck(active, this.currentTrackIndex);
+      if (!active.src || active.error) {
+        this.prepareDeck(active, this.currentTrackIndex, true);
       }
       if (active.paused) {
         this.syncPhysicalVolumes();
@@ -297,6 +297,7 @@ class DualDeckCrossfadeController {
               return;
             }
             this.isPlaying = true;
+            this.isLoading = false;
             this.notify();
           })
           .catch(() => {
@@ -407,6 +408,22 @@ class DualDeckCrossfadeController {
       }
     });
 
+    el.addEventListener('error', () => {
+      if (this.activeSlot !== slot || this.isUnloading) return;
+      this.isLoading = false;
+      const track = LOOKSMAX_PLAYLIST[this.currentTrackIndex] || LOOKSMAX_PLAYLIST[0];
+      // Сбрасываем возможный битый blob URL и пробуем прямой локальный поток
+      this.blobUrlCache.delete(track.streamUrl);
+      if (!el.src.includes('?reload=')) {
+        el.src = `${track.streamUrl}?reload=${Date.now()}`;
+        el.load();
+        if (this.isMainScreenActive && !this.userExplicitlyPaused && !this.systemPaused) {
+          el.play().catch(() => {});
+        }
+      }
+      this.notify();
+    });
+
     return el;
   }
 
@@ -418,21 +435,29 @@ class DualDeckCrossfadeController {
     return this.activeSlot === 'A' ? this.deckB : this.deckA;
   }
 
-  private prepareDeck(deck: HTMLAudioElement | null, trackIndex: number): void {
+  private prepareDeck(
+    deck: HTMLAudioElement | null,
+    trackIndex: number,
+    forceDirectStream = false
+  ): void {
     if (!deck) return;
     const normalizedIdx =
       ((trackIndex % LOOKSMAX_PLAYLIST.length) + LOOKSMAX_PLAYLIST.length) %
       LOOKSMAX_PLAYLIST.length;
     const track = LOOKSMAX_PLAYLIST[normalizedIdx];
 
-    const cachedBlobUrl = this.blobUrlCache.get(track.streamUrl);
+    const cachedBlobUrl = !forceDirectStream
+      ? this.blobUrlCache.get(track.streamUrl)
+      : undefined;
     if (cachedBlobUrl) {
       deck.src = cachedBlobUrl;
       deck.load();
       this.applyPlaybackRateToDeck(deck);
     } else {
       // Ставим прямой локальный путь сразу, а параллельно кэшируем в Blob-память для следующих проигрываний
-      deck.src = track.streamUrl;
+      deck.src = forceDirectStream
+        ? `${track.streamUrl}?r=${Date.now()}`
+        : track.streamUrl;
       deck.load();
       this.applyPlaybackRateToDeck(deck);
       this.getOrLoadBlobUrl(track.streamUrl).catch(() => {});
@@ -705,6 +730,89 @@ class DualDeckCrossfadeController {
       active.play().catch(() => {});
       this.notify();
     }
+  }
+
+  /**
+   * Полный перезапуск (Reload) аудио-плеера:
+   * Сбрасывает зависшие кроссфейды, пересоздает оба HTMLAudioElement (Deck A и Deck B),
+   * очищает кэш текущего трека и принудительно запускает воспроизведение.
+   */
+  public reloadPlayer(): void {
+    if (this.fadeIntervalId !== null) {
+      window.clearInterval(this.fadeIntervalId);
+      this.fadeIntervalId = null;
+    }
+
+    // Останавливаем и очищаем старые деки
+    try {
+      if (this.deckA) {
+        this.deckA.pause();
+        this.deckA.removeAttribute('src');
+        this.deckA.load();
+      }
+      if (this.deckB) {
+        this.deckB.pause();
+        this.deckB.removeAttribute('src');
+        this.deckB.load();
+      }
+    } catch {
+      // ignore cleanup errors
+    }
+
+    const currentTrack =
+      LOOKSMAX_PLAYLIST[this.currentTrackIndex] || LOOKSMAX_PLAYLIST[0];
+    const oldBlobUrl = this.blobUrlCache.get(currentTrack.streamUrl);
+    if (oldBlobUrl) {
+      try {
+        URL.revokeObjectURL(oldBlobUrl);
+      } catch {
+        // ignore
+      }
+      this.blobUrlCache.delete(currentTrack.streamUrl);
+    }
+    this.pendingFetches.delete(currentTrack.streamUrl);
+
+    // Пересоздаем свежие аудио-элементы
+    this.deckA = this.createDeckElement('A');
+    this.deckB = this.createDeckElement('B');
+    this.activeSlot = 'A';
+    this.deckAVolumeFactor = 1.0;
+    this.deckBVolumeFactor = 0.0;
+
+    if (this.masterVolume <= 0) {
+      this.masterVolume = 0.05;
+    }
+
+    this.isUnloading = false;
+    this.isMainScreenActive = true;
+    this.systemPaused = false;
+    this.userExplicitlyPaused = false;
+    this.isCrossfading = false;
+    this.autoCrossfadeTriggered = false;
+    this.currentTime = 0;
+    this.duration = 0;
+    this.isLoading = true;
+    this.isPlaying = true;
+
+    this.syncPhysicalVolumes();
+    this.prepareDeck(this.deckA, this.currentTrackIndex, true);
+
+    if (this.deckA) {
+      this.applyPlaybackRateToDeck(this.deckA);
+      this.deckA
+        .play()
+        .then(() => {
+          this.isPlaying = true;
+          this.isLoading = false;
+          this.notify();
+        })
+        .catch(() => {
+          this.isLoading = false;
+          this.notify();
+        });
+    }
+
+    this.notify();
   }
 
   public setSystemPaused(paused: boolean): void {
