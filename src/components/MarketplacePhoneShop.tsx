@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   calculateItemCost,
   calculateMaxAffordable,
@@ -10,9 +10,19 @@ import {
 } from '../modules/mechanics';
 import { PlayerProfileData } from '../modules/profile';
 import { formatLooks } from '../modules/utils';
+import {
+  GIRL_CONTACTS,
+  GirlContactProfile,
+  MessageTone,
+  MessengerDialogItem,
+  PhoneMessengerApp,
+  pickPhraseByTone,
+  rollMessageToneForRank,
+} from './PhoneMessengerApp';
 import { UpgradeSketchArt } from './UpgradeSketchArt';
 
 export type BuyMultiplierMode = 1 | 10 | 'MAX';
+type PhoneAppId = 'ozon' | 'wb' | 'messenger';
 
 export interface MarketplacePhoneShopProps {
   profile: PlayerProfileData;
@@ -27,6 +37,13 @@ export interface MarketplacePhoneShopProps {
   onBuyShopItem: (item: ShopItemDefinition) => void;
 }
 
+function getCurrentTimeHHMM(): string {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
 export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
   profile,
   shopCategory,
@@ -39,6 +56,245 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
   bestRoiItemId,
   onBuyShopItem,
 }) => {
+  const [activePhoneApp, setActivePhoneApp] = useState<PhoneAppId>(() =>
+    shopCategory === 'click' ? 'ozon' : 'wb'
+  );
+  const [messengerFilter, setMessengerFilter] = useState<'all' | 'unread'>('all');
+  const [notificationsMuted, setNotificationsMuted] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('psl_messenger_muted') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  // Определяем текущий ранг игрока по очкам текущего забега
+  const currentRank = useMemo(() => {
+    for (let i = PSL_RANKS.length - 1; i >= 0; i--) {
+      if (profile.currentRunTotalLooks >= PSL_RANKS[i].requiredLooks) {
+        return PSL_RANKS[i];
+      }
+    }
+    return PSL_RANKS[0];
+  }, [profile.currentRunTotalLooks]);
+
+  const currentRankIndex = currentRank.index;
+
+  // Список диалогов с девушками (расширяется по мере роста ранга PSL)
+  const [dialogs, setDialogs] = useState<MessengerDialogItem[]>(() => {
+    const initialGirls = GIRL_CONTACTS.filter((g) => g.minRankIndex <= currentRankIndex);
+    const baseNow = Date.now();
+    return initialGirls.map((girl, idx) => {
+      const tone = rollMessageToneForRank(currentRankIndex);
+      return {
+        girl,
+        lastMessage: pickPhraseByTone(tone),
+        timeLabel: getCurrentTimeHHMM(),
+        unreadCount: idx < 2 ? 1 : 0,
+        isTyping: false,
+        isNegative: tone === 'negative',
+        tone,
+        updatedAt: baseNow - idx * 60000,
+      };
+    });
+  });
+
+  // Всплывающее пуш-уведомление в верхней части экрана смартфона
+  const [pushToast, setPushToast] = useState<{
+    id: number;
+    girl: GirlContactProfile;
+    text: string;
+    tone: MessageTone;
+  } | null>(null);
+
+  const prevRankIndexRef = useRef<number>(currentRankIndex);
+
+  // При повышении уровня разблокируем новых девушек и обновляем тон сообщений
+  useEffect(() => {
+    const unlockedGirls = GIRL_CONTACTS.filter(
+      (g) => g.minRankIndex <= currentRankIndex
+    );
+    const rankIncreased = currentRankIndex > prevRankIndexRef.current;
+    prevRankIndexRef.current = currentRankIndex;
+
+    setDialogs((prev) => {
+      const existingMap = new Map<string, MessengerDialogItem>(
+        prev.map((d) => [d.girl.id, d])
+      );
+      const now = Date.now();
+      const timeStr = getCurrentTimeHHMM();
+
+      const nextList: MessengerDialogItem[] = unlockedGirls.map((girl, idx) => {
+        const existing = existingMap.get(girl.id);
+        if (existing) {
+          // При повышении ранга часть прежних собеседниц пересматривает отношение к игроку
+          if (rankIncreased && (existing.tone === 'negative' || currentRankIndex >= 5)) {
+            const newTone = rollMessageToneForRank(currentRankIndex);
+            if (newTone !== existing.tone) {
+              return {
+                ...existing,
+                lastMessage: pickPhraseByTone(newTone, existing.lastMessage),
+                timeLabel: timeStr,
+                unreadCount: existing.unreadCount + 1,
+                isNegative: newTone === 'negative',
+                tone: newTone,
+                updatedAt: now - idx * 500,
+              };
+            }
+          }
+          return existing;
+        }
+
+        // Новая девушка сразу пишет игроку при разблокировке уровня
+        const tone = rollMessageToneForRank(currentRankIndex);
+        const phrase = pickPhraseByTone(tone);
+        return {
+          girl,
+          lastMessage: phrase,
+          timeLabel: timeStr,
+          unreadCount: 1,
+          isTyping: false,
+          isNegative: tone === 'negative',
+          tone,
+          updatedAt: now + (unlockedGirls.length - idx) * 1000,
+        };
+      });
+
+      if (rankIncreased && nextList.length > 0 && !notificationsMuted) {
+        const newestGirl = unlockedGirls[unlockedGirls.length - 1];
+        const newestDialog = nextList.find((d) => d.girl.id === newestGirl.id);
+        if (newestDialog) {
+          setPushToast({
+            id: Date.now(),
+            girl: newestDialog.girl,
+            text: newestDialog.lastMessage,
+            tone: newestDialog.tone,
+          });
+        }
+      }
+
+      return nextList.sort((a, b) => b.updatedAt - a.updatedAt);
+    });
+  }, [currentRankIndex, notificationsMuted]);
+
+  // Автоматическое скрытие пуш-уведомления через 3.6 секунды
+  useEffect(() => {
+    if (!pushToast) return;
+    const timer = window.setTimeout(() => {
+      setPushToast(null);
+    }, 3600);
+    return () => window.clearTimeout(timer);
+  }, [pushToast]);
+
+  // Живой генератор входящих сообщений от девушек (чем выше ранг, тем чаще пишут)
+  useEffect(() => {
+    const intervalMs = Math.max(3800, 7800 - currentRankIndex * 520);
+    let typingTimeoutId: number | null = null;
+
+    const intervalId = window.setInterval(() => {
+      const unlockedGirls = GIRL_CONTACTS.filter(
+        (g) => g.minRankIndex <= currentRankIndex
+      );
+      if (unlockedGirls.length === 0) return;
+
+      const targetGirl =
+        unlockedGirls[Math.floor(Math.random() * unlockedGirls.length)];
+
+      // 1. Включаем статус "печатает..." на 1.1 секунды
+      setDialogs((prev) =>
+        prev.map((d) =>
+          d.girl.id === targetGirl.id ? { ...d, isTyping: true } : d
+        )
+      );
+
+      // 2. Доставляем новое сообщение (на средних уровнях — микс негатива, нейтрала и восхищения)
+      typingTimeoutId = window.setTimeout(() => {
+        const tone = rollMessageToneForRank(currentRankIndex);
+        const phrase = pickPhraseByTone(tone);
+        const timeStr = getCurrentTimeHHMM();
+
+        setDialogs((prev) => {
+          const updated = prev.map((d) => {
+            if (d.girl.id !== targetGirl.id) return d;
+            return {
+              ...d,
+              lastMessage: phrase,
+              timeLabel: timeStr,
+              unreadCount: Math.min(99, d.unreadCount + 1),
+              isTyping: false,
+              isNegative: tone === 'negative',
+              tone,
+              updatedAt: Date.now(),
+            };
+          });
+          return [...updated].sort((a, b) => b.updatedAt - a.updatedAt);
+        });
+
+        if (!notificationsMuted) {
+          setPushToast({
+            id: Date.now(),
+            girl: targetGirl,
+            text: phrase,
+            tone,
+          });
+        }
+      }, 1100);
+    }, intervalMs);
+
+    return () => {
+      window.clearInterval(intervalId);
+      if (typingTimeoutId !== null) {
+        window.clearTimeout(typingTimeoutId);
+      }
+    };
+  }, [currentRankIndex, activePhoneApp, notificationsMuted]);
+
+  const handleSelectOzon = useCallback(() => {
+    setShopCategory('click');
+    setActivePhoneApp('ozon');
+  }, [setShopCategory]);
+
+  const handleSelectWb = useCallback(() => {
+    setShopCategory('passive');
+    setActivePhoneApp('wb');
+  }, [setShopCategory]);
+
+  const handleSelectMessenger = useCallback(() => {
+    setActivePhoneApp('messenger');
+    setPushToast(null);
+  }, []);
+
+  const handleToggleNotificationsMuted = useCallback(() => {
+    setNotificationsMuted((prev) => {
+      const next = !prev;
+      if (next) {
+        setPushToast(null);
+      }
+      try {
+        window.localStorage.setItem('psl_messenger_muted', next ? '1' : '0');
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  }, []);
+
+  const handleMarkDialogRead = useCallback((girlId: string) => {
+    setDialogs((prev) =>
+      prev.map((d) => (d.girl.id === girlId ? { ...d, unreadCount: 0 } : d))
+    );
+  }, []);
+
+  const handleMarkAllRead = useCallback(() => {
+    setDialogs((prev) => prev.map((d) => ({ ...d, unreadCount: 0 })));
+  }, []);
+
+  const totalUnreadMessages = useMemo(
+    () => dialogs.reduce((acc, d) => acc + d.unreadCount, 0),
+    [dialogs]
+  );
+
+  const isMessengerOpen = activePhoneApp === 'messenger';
   const isClickMarket = shopCategory === 'click';
   const marketTheme: 'ozon' | 'wb' = isClickMarket ? 'ozon' : 'wb';
 
@@ -85,7 +341,7 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
         />
 
         {/* ===================================================================== */}
-        {/* ЛИЦЕВАЯ СТОРОНА (FRONT FACE): Экран смартфона с маркетплейсом внутри */}
+        {/* ЛИЦЕВАЯ СТОРОНА (FRONT FACE): Экран смартфона с 3 приложениями        */}
         {/* ===================================================================== */}
         <div
           className={`w-full rounded-[48px] p-[7px] bg-gradient-to-b from-[#F77B3E] via-[#DF5618] to-[#A63808] shadow-[0_24px_60px_rgba(0,0,0,0.65),0_0_28px_rgba(234,88,28,0.22),inset_0_1.5px_2px_rgba(255,196,156,0.75),inset_0_-2px_3px_rgba(90,26,3,0.85)] border border-[#FF9B66]/45 ${
@@ -124,16 +380,51 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
 
             {/* OLED-дисплей смартфона */}
             <div
-              className={`rounded-[35px] border overflow-hidden transition-colors duration-200 flex flex-col ${
-                isClickMarket
+              className={`relative rounded-[35px] border overflow-hidden transition-colors duration-200 flex flex-col ${
+                isMessengerOpen
+                  ? 'border-[#2AABEE]/40 bg-[#17212B]'
+                  : isClickMarket
                   ? 'border-[#005BFF]/40 bg-[#0D1526]'
                   : 'border-[#CB11AB]/40 bg-[#170E24]'
               }`}
             >
+              {/* Всплывающий баннер пуш-уведомления под Dynamic Island (если открыт магазин и уведомления не отключены) */}
+              {pushToast && !isMessengerOpen && !notificationsMuted && (
+                <button
+                  type="button"
+                  onClick={handleSelectMessenger}
+                  className="absolute top-10 left-2.5 right-2.5 z-40 p-2.5 rounded-2xl bg-[#212D3B]/95 backdrop-blur-xl border border-[#3E99E6]/50 shadow-[0_12px_28px_rgba(0,0,0,0.75)] flex items-center gap-2.5 text-left cursor-pointer hover:bg-[#263545] transition-all"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-b from-[#2AABEE] to-[#229ED9] flex items-center justify-center shrink-0 shadow-sm">
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white">
+                      <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[11px] font-bold text-white truncate">
+                        {pushToast.girl.name}{' '}
+                        <span className="font-normal text-[#6AB3F3]">· ТелеГрамм</span>
+                      </span>
+                      <span className="text-[9px] font-mono text-[#7F91A4] shrink-0">
+                        сейчас
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#E2E8F0] truncate">
+                      {pushToast.text}
+                    </p>
+                  </div>
+                </button>
+              )}
+
               {/* Статус-бар смартфона + Dynamic Island */}
               <div
                 className={`px-5 pt-2 pb-1.5 flex items-center justify-between select-none transition-colors duration-200 ${
-                  isClickMarket ? 'bg-[#0047CC]' : 'bg-[#981088]'
+                  isMessengerOpen
+                    ? 'bg-[#212D3B]'
+                    : isClickMarket
+                    ? 'bg-[#0047CC]'
+                    : 'bg-[#981088]'
                 }`}
               >
                 <span className="text-[11px] font-semibold tracking-tight text-white font-mono tabular-nums">
@@ -180,364 +471,409 @@ export const MarketplacePhoneShop: React.FC<MarketplacePhoneShopProps> = ({
                 </div>
               </div>
 
-              {/* Фирменная шапка маркетплейса */}
-              <div
-                className={`px-4 py-3 border-b transition-colors duration-200 ${
-                  isClickMarket
-                    ? 'bg-gradient-to-r from-[#005BFF] via-[#0047CC] to-[#1D3570] border-[#005BFF]/40'
-                    : 'bg-gradient-to-r from-[#CB11AB] via-[#8E118C] to-[#481173] border-[#CB11AB]/40'
-                }`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
-                        isClickMarket
-                          ? 'bg-white text-[#005BFF] border-white/60 shadow-sm'
-                          : 'bg-white/15 text-white border-white/30 backdrop-blur-sm'
-                      }`}
-                    >
-                      {isClickMarket ? (
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="w-5 h-5"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <circle
-                            cx="11"
-                            cy="12"
-                            r="6.5"
-                            stroke="#005BFF"
-                            strokeWidth="2.8"
-                          />
-                          <path
-                            d="M17.5 7.5L21 5.5M18 12H22M17.5 16.5L21 18.5"
-                            stroke="#F91155"
-                            strokeWidth="2.4"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="w-5 h-5"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <circle cx="9.5" cy="13.5" r="4.5" fill="#F472B6" />
-                          <circle cx="15" cy="14" r="4" fill="#E879F9" />
-                          <path
-                            d="M12 9C12 6.5 14 4.5 16.5 4.5M12 9C10.5 6.8 8.5 6 7 6"
-                            stroke="#FFFFFF"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      )}
-                    </div>
+              {/* ДОК-ПАНЕЛЬ ПЕРЕКЛЮЧЕНИЯ 3 ПРИЛОЖЕНИЙ В ТЕЛЕФОНЕ: О-ЗОНА | ЯГОДКИ | ТЕЛЕГРАММ */}
+              <div className="px-3 py-2 bg-[#090D16] border-b border-white/10 grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleSelectOzon}
+                  className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                    activePhoneApp === 'ozon'
+                      ? 'bg-[#005BFF] text-white border-[#60A5FA]/60 shadow-[0_2px_10px_rgba(0,91,255,0.4)]'
+                      : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#F91155] shrink-0" />
+                  <span className="truncate">О-ЗОНА</span>
+                </button>
 
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <h2 className="text-base font-extrabold tracking-tight text-white font-display truncate">
-                          {isClickMarket ? 'О-ЗОНА · Клик' : 'ЯГОДКИ · Уход'}
-                        </h2>
-                        <span
-                          className={`text-[11px] font-mono font-bold ${
-                            isClickMarket ? 'text-[#FFB4C8]' : 'text-[#F5D0FE]'
-                          }`}
-                        >
-                          · {isClickMarket ? 'Экспресс' : 'Beauty'}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-white/85 truncate">
-                        {isClickMarket
-                          ? 'ПВЗ «Челюстной» · выдача за 1 клик'
-                          : 'Склад эстетики · 4.9 ★ проверено'}
-                      </div>
-                    </div>
-                  </div>
+                <button
+                  type="button"
+                  onClick={handleSelectWb}
+                  className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                    activePhoneApp === 'wb'
+                      ? 'bg-gradient-to-r from-[#CB11AB] to-[#7E22CE] text-white border-[#F472B6]/60 shadow-[0_2px_10px_rgba(203,17,171,0.4)]'
+                      : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#F472B6] shrink-0" />
+                  <span className="truncate">ЯГОДКИ</span>
+                </button>
 
-                  <div className="flex items-center gap-1.5">
-                    {/* Переключатель пакета заказа: x1, x10, MAX */}
-                    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-950/45 border border-white/20">
-                      {([1, 10, 'MAX'] as BuyMultiplierMode[]).map((mode) => (
-                        <button
-                          key={String(mode)}
-                          type="button"
-                          onClick={() => setBuyMode(mode)}
-                          className={`px-2 py-0.5 rounded-md text-xs font-mono font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                            buyMode === mode
-                              ? isClickMarket
-                                ? 'bg-[#F91155] text-white'
-                                : 'bg-white text-[#6B1169]'
-                              : 'text-white/75 hover:text-white'
-                          }`}
-                        >
-                          {mode === 'MAX' ? 'MAX' : `×${mode}`}
-                        </button>
-                      ))}
-                    </div>
+                <button
+                  type="button"
+                  onClick={handleSelectMessenger}
+                  className={`relative py-1.5 px-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                    activePhoneApp === 'messenger'
+                      ? 'bg-gradient-to-r from-[#2AABEE] to-[#229ED9] text-white border-sky-300/60 shadow-[0_2px_12px_rgba(42,171,238,0.45)]'
+                      : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {/* Иконка бумажного самолётика в стиле Telegram */}
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current shrink-0">
+                    <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
+                  </svg>
+                  <span className="truncate">ТелеГрамм</span>
+                  {totalUnreadMessages > 0 && !notificationsMuted && (
+                    <span className="px-1.5 min-w-[16px] h-4 rounded-full text-[9px] font-mono font-extrabold bg-[#F91155] text-white flex items-center justify-center shrink-0">
+                      {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
+                    </span>
+                  )}
+                </button>
+              </div>
 
+              {isMessengerOpen ? (
+                <>
+                  <PhoneMessengerApp
+                    currentRankIndex={currentRankIndex}
+                    currentRankTitle={currentRank.title}
+                    dialogs={dialogs}
+                    activeFilter={messengerFilter}
+                    setActiveFilter={setMessengerFilter}
+                    onMarkDialogRead={handleMarkDialogRead}
+                    onMarkAllRead={handleMarkAllRead}
+                    notificationsMuted={notificationsMuted}
+                    onToggleNotificationsMuted={handleToggleNotificationsMuted}
+                  />
+                  {/* Нижний индикатор Home Bar в мессенджере */}
+                  <div className="bg-[#17212B] pt-2 pb-1.5 flex flex-col items-center justify-center">
                     <button
                       type="button"
                       onClick={() => setIsShopMinimized(true)}
-                      className="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-950/35 text-white/90 hover:bg-slate-950/55 border border-white/20 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                      title="Свернуть и перевернуть задней крышкой"
+                      className="group py-1 px-6 cursor-pointer flex items-center justify-center"
                     >
-                      Свернуть
+                      <span className="w-32 h-1.5 rounded-full bg-white/30 group-hover:bg-white/65 transition-colors" />
                     </button>
                   </div>
-                </div>
-              </div>
-
-              <div className="p-3.5 flex-1 flex flex-col">
-                {/* Переключатель витрин маркетплейса: Клик (О-ЗОНА) vs Уход (ЯГОДКИ) */}
-                <div
-                  className={`grid grid-cols-2 gap-1.5 p-1 rounded-xl border ${
-                    isClickMarket
-                      ? 'bg-[#090F1C] border-[#1E3A8A]/60'
-                      : 'bg-[#10091A] border-[#581C87]/60'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setShopCategory('click')}
-                    className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center gap-1.5 ${
-                      shopCategory === 'click'
-                        ? 'bg-[#005BFF] text-white shadow-[0_4px_14px_rgba(0,91,255,0.4)]'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-[#F91155] shrink-0" />
-                    <span>Клик · О-ЗОНА</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShopCategory('passive')}
-                    className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center justify-center gap-1.5 ${
-                      shopCategory === 'passive'
-                        ? 'bg-gradient-to-r from-[#CB11AB] to-[#7E22CE] text-white shadow-[0_4px_14px_rgba(203,17,171,0.4)]'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-[#F472B6] shrink-0" />
-                    <span>Уход · ЯГОДКИ</span>
-                  </button>
-                </div>
-
-                {/* Информационная строка программы лояльности текущей витрины */}
-                <div className="mt-2.5 px-1 flex items-center justify-between text-[11px] font-mono tabular-nums text-slate-300">
-                  <span>
-                    {isClickMarket
-                      ? 'Синяя Карта активна · Мгновенная выдача'
-                      : 'Ягодный Кошелёк активен · Склад красоты'}
-                  </span>
-                  <span
-                    className={
+                </>
+              ) : (
+                <>
+                  {/* Фирменная шапка маркетплейса */}
+                  <div
+                    className={`px-4 py-3 border-b transition-colors duration-200 ${
                       isClickMarket
-                        ? 'text-[#60A5FA] font-semibold'
-                        : 'text-[#F472B6] font-semibold'
-                    }
+                        ? 'bg-gradient-to-r from-[#005BFF] via-[#0047CC] to-[#1D3570] border-[#005BFF]/40'
+                        : 'bg-gradient-to-r from-[#CB11AB] via-[#8E118C] to-[#481173] border-[#CB11AB]/40'
+                    }`}
                   >
-                    {isClickMarket ? 'ПВЗ 0 PSL' : 'Рейтинг 4.9 ★'}
-                  </span>
-                </div>
-
-                {/* Список товаров-улучшений */}
-                <div className="mt-2.5 space-y-2.5 overflow-y-auto max-h-[520px] pr-1">
-                  {filteredShopItems.map((item) => {
-                    const currentLevel = profile.itemLevels[item.id] || 0;
-                    const maxillaLevel = profile.perkLevels['forward_maxilla'] || 0;
-                    const isUnlocked =
-                      profile.highestRankIndexReached >=
-                      Math.max(0, item.unlockAtRankIndex - 1);
-                    const isBestRoi = isUnlocked && item.id === bestRoiItemId;
-
-                    let buyCount = 1;
-                    let cost = 0;
-                    if (buyMode === 'MAX') {
-                      const maxInfo = calculateMaxAffordable(
-                        item,
-                        currentLevel,
-                        profile.looks,
-                        maxillaLevel
-                      );
-                      buyCount = maxInfo.count;
-                      cost = maxInfo.totalCost;
-                    } else {
-                      buyCount = buyMode;
-                      cost = calculateItemCost(
-                        item,
-                        currentLevel,
-                        buyCount,
-                        maxillaLevel
-                      );
-                    }
-
-                    const canAfford = isUnlocked && profile.looks >= cost;
-                    const nextMilestone = getNextMilestone(currentLevel);
-                    const prevMilestone = getPreviousMilestone(currentLevel);
-                    const milestoneProgress = nextMilestone
-                      ? Math.max(
-                          0,
-                          Math.min(
-                            1,
-                            (currentLevel - prevMilestone) /
-                              Math.max(1, nextMilestone - prevMilestone)
-                          )
-                        )
-                      : 1;
-                    const levelsToMilestone = nextMilestone
-                      ? Math.max(0, nextMilestone - currentLevel)
-                      : 0;
-
-                    return (
-                      <div
-                        key={item.id}
-                        className={`p-3 rounded-xl border transition-colors flex items-center gap-3.5 ${
-                          !isUnlocked
-                            ? isClickMarket
-                              ? 'border-[#162238] bg-[#090F1C]/65 opacity-60'
-                              : 'border-[#27163A] bg-[#10091A]/65 opacity-60'
-                            : isBestRoi
-                            ? isClickMarket
-                              ? 'border-[#F91155]/65 hover:border-[#F91155] bg-[#111C33]'
-                              : 'border-[#F472B6]/65 hover:border-[#F472B6] bg-[#211334]'
-                            : canAfford
-                            ? isClickMarket
-                              ? 'border-[#1E3A8A] hover:border-[#005BFF] bg-[#101A2E]'
-                              : 'border-[#4C1D95] hover:border-[#CB11AB] bg-[#1D112E]'
-                            : isClickMarket
-                            ? 'border-[#172540] bg-[#0B1221]'
-                            : 'border-[#2E1846] bg-[#130B1F]'
-                        }`}
-                      >
-                        <UpgradeSketchArt
-                          itemId={item.id}
-                          locked={!isUnlocked}
-                          marketplaceTheme={marketTheme}
-                          isHotDeal={isBestRoi}
-                        />
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="text-sm font-semibold text-white font-display truncate">
-                              {item.name}
-                            </h3>
-                            <span className="text-xs font-mono tabular-nums text-slate-300 shrink-0">
-                              Ур. {currentLevel}
-                              {isBestRoi ? (
-                                <span
-                                  className={
-                                    isClickMarket
-                                      ? 'text-[#FF477E] font-semibold'
-                                      : 'text-[#F472B6] font-semibold'
-                                  }
-                                >
-                                  {' '}
-                                  · {isClickMarket ? 'Распродажа' : 'Хит выгоды'}
-                                </span>
-                              ) : null}
-                            </span>
-                          </div>
-
-                          <div className="mt-2 flex items-center justify-between gap-2">
-                            <div
-                              className={`text-xs font-mono tabular-nums font-medium ${
-                                isClickMarket ? 'text-[#60A5FA]' : 'text-[#E879F9]'
-                              }`}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                            isClickMarket
+                              ? 'bg-white text-[#005BFF] border-white/60 shadow-sm'
+                              : 'bg-white/15 text-white border-white/30 backdrop-blur-sm'
+                          }`}
+                        >
+                          {isClickMarket ? (
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="w-5 h-5"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
                             >
-                              {item.category === 'click'
-                                ? `+${formatLooks(item.baseClickBonus)} клик`
-                                : `+${formatLooks(item.basePassiveBonus)} /с`}
-                              {item.critChanceBonus
-                                ? ` · +${(item.critChanceBonus * 100).toFixed(1)}% крит`
-                                : ''}
-                            </div>
-
-                            <button
-                              type="button"
-                              disabled={!canAfford}
-                              onClick={() => onBuyShopItem(item)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold tabular-nums transition-all whitespace-nowrap shrink-0 ${
-                                !isUnlocked
-                                  ? 'bg-white/5 text-slate-500 cursor-not-allowed'
-                                  : canAfford
-                                  ? isClickMarket
-                                    ? isBestRoi
-                                      ? 'bg-[#F91155] text-white hover:bg-[#FF2E6C] shadow-[0_2px_10px_rgba(249,17,85,0.35)] cursor-pointer'
-                                      : 'bg-[#005BFF] text-white hover:bg-[#1D6BFF] shadow-[0_2px_10px_rgba(0,91,255,0.35)] cursor-pointer'
-                                    : isBestRoi
-                                    ? 'bg-gradient-to-r from-[#F43F5E] to-[#CB11AB] text-white hover:brightness-110 shadow-[0_2px_10px_rgba(203,17,171,0.4)] cursor-pointer'
-                                    : 'bg-[#CB11AB] text-white hover:bg-[#DF19BD] shadow-[0_2px_10px_rgba(203,17,171,0.35)] cursor-pointer'
-                                  : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
-                              }`}
+                              <circle
+                                cx="11"
+                                cy="12"
+                                r="6.5"
+                                stroke="#005BFF"
+                                strokeWidth="2.8"
+                              />
+                              <path
+                                d="M17.5 7.5L21 5.5M18 12H22M17.5 16.5L21 18.5"
+                                stroke="#F91155"
+                                strokeWidth="2.4"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="w-5 h-5"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
                             >
-                              {!isUnlocked
-                                ? `С ${PSL_RANKS[item.unlockAtRankIndex]?.title}`
-                                : `${formatLooks(cost)} PSL${
-                                    buyCount > 1 ? ` (×${buyCount})` : ''
-                                  }`}
-                            </button>
-                          </div>
-
-                          {/* Тонкая шкала прогресса до ближайшего бонуса ×2 */}
-                          {isUnlocked && (
-                            <div className="mt-2 space-y-1">
-                              <div className="flex items-center justify-between text-[11px] font-mono tabular-nums text-slate-400">
-                                <span>
-                                  {nextMilestone
-                                    ? isClickMarket
-                                      ? `До акции ×2 (Ур. ${nextMilestone})`
-                                      : `До бонуса ×2 (Ур. ${nextMilestone})`
-                                    : 'Все рубежи ×2 открыты'}
-                                </span>
-                                <span>
-                                  {nextMilestone
-                                    ? `ещё ${levelsToMilestone} шт.`
-                                    : 'МАКС'}
-                                </span>
-                              </div>
-                              <div
-                                className={`w-full h-1 rounded-full overflow-hidden ${
-                                  isClickMarket ? 'bg-[#080D18]' : 'bg-[#0F0817]'
-                                }`}
-                              >
-                                <div
-                                  className={`h-full transition-transform duration-150 origin-left ${
-                                    isClickMarket
-                                      ? isBestRoi
-                                        ? 'bg-gradient-to-r from-[#005BFF] to-[#F91155]'
-                                        : 'bg-[#005BFF]'
-                                      : isBestRoi
-                                      ? 'bg-gradient-to-r from-[#CB11AB] to-[#F43F5E]'
-                                      : 'bg-[#CB11AB]'
-                                  }`}
-                                  style={{
-                                    transform: `scaleX(${milestoneProgress})`,
-                                  }}
-                                />
-                              </div>
-                            </div>
+                              <circle cx="9.5" cy="13.5" r="4.5" fill="#F472B6" />
+                              <circle cx="15" cy="14" r="4" fill="#E879F9" />
+                              <path
+                                d="M12 9C12 6.5 14 4.5 16.5 4.5M12 9C10.5 6.8 8.5 6 7 6"
+                                stroke="#FFFFFF"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                            </svg>
                           )}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
 
-                {/* Нижний индикатор Home Bar */}
-                <div className="pt-3 pb-0.5 flex flex-col items-center justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setIsShopMinimized(true)}
-                    title="Свернуть и перевернуть задней крышкой"
-                    className="group py-1 px-6 cursor-pointer flex items-center justify-center"
-                  >
-                    <span className="w-32 h-1.5 rounded-full bg-white/30 group-hover:bg-white/65 transition-colors" />
-                  </button>
-                </div>
-              </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h2 className="text-base font-extrabold tracking-tight text-white font-display truncate">
+                              {isClickMarket ? 'О-ЗОНА · Клик' : 'ЯГОДКИ · Уход'}
+                            </h2>
+                            <span
+                              className={`text-[11px] font-mono font-bold ${
+                                isClickMarket ? 'text-[#FFB4C8]' : 'text-[#F5D0FE]'
+                              }`}
+                            >
+                              · {isClickMarket ? 'Экспресс' : 'Beauty'}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-white/85 truncate">
+                            {isClickMarket
+                              ? 'ПВЗ «Челюстной» · выдача за 1 клик'
+                              : 'Склад эстетики · 4.9 ★ проверено'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Переключатель пакета заказа: x1, x10, MAX */}
+                        <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-950/45 border border-white/20">
+                          {([1, 10, 'MAX'] as BuyMultiplierMode[]).map((mode) => (
+                            <button
+                              key={String(mode)}
+                              type="button"
+                              onClick={() => setBuyMode(mode)}
+                              className={`px-2 py-0.5 rounded-md text-xs font-mono font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                                buyMode === mode
+                                  ? isClickMarket
+                                    ? 'bg-[#F91155] text-white'
+                                    : 'bg-white text-[#6B1169]'
+                                  : 'text-white/75 hover:text-white'
+                              }`}
+                            >
+                              {mode === 'MAX' ? 'MAX' : `×${mode}`}
+                            </button>
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsShopMinimized(true)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-950/35 text-white/90 hover:bg-slate-950/55 border border-white/20 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                        >
+                          Свернуть
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 flex-1 flex flex-col">
+                    {/* Информационная строка программы лояльности текущей витрины */}
+                    <div className="px-1 flex items-center justify-between text-[11px] font-mono tabular-nums text-slate-300">
+                      <span>
+                        {isClickMarket
+                          ? 'Синяя Карта активна · Мгновенная выдача'
+                          : 'Ягодный Кошелёк активен · Склад красоты'}
+                      </span>
+                      <span
+                        className={
+                          isClickMarket
+                            ? 'text-[#60A5FA] font-semibold'
+                            : 'text-[#F472B6] font-semibold'
+                        }
+                      >
+                        {isClickMarket ? 'ПВЗ 0 PSL' : 'Рейтинг 4.9 ★'}
+                      </span>
+                    </div>
+
+                    {/* Список товаров-улучшений */}
+                    <div className="mt-2.5 space-y-2.5 overflow-y-auto max-h-[520px] pr-1">
+                      {filteredShopItems.map((item) => {
+                        const currentLevel = profile.itemLevels[item.id] || 0;
+                        const maxillaLevel = profile.perkLevels['forward_maxilla'] || 0;
+                        const isUnlocked =
+                          profile.highestRankIndexReached >=
+                          Math.max(0, item.unlockAtRankIndex - 1);
+                        const isBestRoi = isUnlocked && item.id === bestRoiItemId;
+
+                        let buyCount = 1;
+                        let cost = 0;
+                        if (buyMode === 'MAX') {
+                          const maxInfo = calculateMaxAffordable(
+                            item,
+                            currentLevel,
+                            profile.looks,
+                            maxillaLevel
+                          );
+                          buyCount = maxInfo.count;
+                          cost = maxInfo.totalCost;
+                        } else {
+                          buyCount = buyMode;
+                          cost = calculateItemCost(
+                            item,
+                            currentLevel,
+                            buyCount,
+                            maxillaLevel
+                          );
+                        }
+
+                        const canAfford = isUnlocked && profile.looks >= cost;
+                        const nextMilestone = getNextMilestone(currentLevel);
+                        const prevMilestone = getPreviousMilestone(currentLevel);
+                        const milestoneProgress = nextMilestone
+                          ? Math.max(
+                              0,
+                              Math.min(
+                                1,
+                                (currentLevel - prevMilestone) /
+                                  Math.max(1, nextMilestone - prevMilestone)
+                              )
+                            )
+                          : 1;
+                        const levelsToMilestone = nextMilestone
+                          ? Math.max(0, nextMilestone - currentLevel)
+                          : 0;
+
+                        return (
+                          <div
+                            key={item.id}
+                            className={`p-3 rounded-xl border transition-colors flex items-center gap-3.5 ${
+                              !isUnlocked
+                                ? isClickMarket
+                                  ? 'border-[#162238] bg-[#090F1C]/65 opacity-60'
+                                  : 'border-[#27163A] bg-[#10091A]/65 opacity-60'
+                                : isBestRoi
+                                ? isClickMarket
+                                  ? 'border-[#F91155]/65 hover:border-[#F91155] bg-[#111C33]'
+                                  : 'border-[#F472B6]/65 hover:border-[#F472B6] bg-[#211334]'
+                                : canAfford
+                                ? isClickMarket
+                                  ? 'border-[#1E3A8A] hover:border-[#005BFF] bg-[#101A2E]'
+                                  : 'border-[#4C1D95] hover:border-[#CB11AB] bg-[#1D112E]'
+                                : isClickMarket
+                                ? 'border-[#172540] bg-[#0B1221]'
+                                : 'border-[#2E1846] bg-[#130B1F]'
+                            }`}
+                          >
+                            <UpgradeSketchArt
+                              itemId={item.id}
+                              locked={!isUnlocked}
+                              marketplaceTheme={marketTheme}
+                              isHotDeal={isBestRoi}
+                            />
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-sm font-semibold text-white font-display truncate">
+                                  {item.name}
+                                </h3>
+                                <span className="text-xs font-mono tabular-nums text-slate-300 shrink-0">
+                                  Ур. {currentLevel}
+                                  {isBestRoi ? (
+                                    <span
+                                      className={
+                                        isClickMarket
+                                          ? 'text-[#FF477E] font-semibold'
+                                          : 'text-[#F472B6] font-semibold'
+                                      }
+                                    >
+                                      {' '}
+                                      · {isClickMarket ? 'Распродажа' : 'Хит выгоды'}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </div>
+
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <div
+                                  className={`text-xs font-mono tabular-nums font-medium ${
+                                    isClickMarket ? 'text-[#60A5FA]' : 'text-[#E879F9]'
+                                  }`}
+                                >
+                                  {item.category === 'click'
+                                    ? `+${formatLooks(item.baseClickBonus)} клик`
+                                    : `+${formatLooks(item.basePassiveBonus)} /с`}
+                                  {item.critChanceBonus
+                                    ? ` · +${(item.critChanceBonus * 100).toFixed(1)}% крит`
+                                    : ''}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  disabled={!canAfford}
+                                  onClick={() => onBuyShopItem(item)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold tabular-nums transition-all whitespace-nowrap shrink-0 ${
+                                    !isUnlocked
+                                      ? 'bg-white/5 text-slate-500 cursor-not-allowed'
+                                      : canAfford
+                                      ? isClickMarket
+                                        ? isBestRoi
+                                          ? 'bg-[#F91155] text-white hover:bg-[#FF2E6C] shadow-[0_2px_10px_rgba(249,17,85,0.35)] cursor-pointer'
+                                          : 'bg-[#005BFF] text-white hover:bg-[#1D6BFF] shadow-[0_2px_10px_rgba(0,91,255,0.35)] cursor-pointer'
+                                        : isBestRoi
+                                        ? 'bg-gradient-to-r from-[#F43F5E] to-[#CB11AB] text-white hover:brightness-110 shadow-[0_2px_10px_rgba(203,17,171,0.4)] cursor-pointer'
+                                        : 'bg-[#CB11AB] text-white hover:bg-[#DF19BD] shadow-[0_2px_10px_rgba(203,17,171,0.35)] cursor-pointer'
+                                      : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
+                                  }`}
+                                >
+                                  {!isUnlocked
+                                    ? `С ${PSL_RANKS[item.unlockAtRankIndex]?.title}`
+                                    : `${formatLooks(cost)} PSL${
+                                        buyCount > 1 ? ` (×${buyCount})` : ''
+                                      }`}
+                                </button>
+                              </div>
+
+                              {/* Тонкая шкала прогресса до ближайшего бонуса ×2 */}
+                              {isUnlocked && (
+                                <div className="mt-2 space-y-1">
+                                  <div className="flex items-center justify-between text-[11px] font-mono tabular-nums text-slate-400">
+                                    <span>
+                                      {nextMilestone
+                                        ? isClickMarket
+                                          ? `До акции ×2 (Ур. ${nextMilestone})`
+                                          : `До бонуса ×2 (Ур. ${nextMilestone})`
+                                        : 'Все рубежи ×2 открыты'}
+                                    </span>
+                                    <span>
+                                      {nextMilestone
+                                        ? `ещё ${levelsToMilestone} шт.`
+                                        : 'МАКС'}
+                                    </span>
+                                  </div>
+                                  <div
+                                    className={`w-full h-1 rounded-full overflow-hidden ${
+                                      isClickMarket ? 'bg-[#080D18]' : 'bg-[#0F0817]'
+                                    }`}
+                                  >
+                                    <div
+                                      className={`h-full transition-transform duration-150 origin-left ${
+                                        isClickMarket
+                                          ? isBestRoi
+                                            ? 'bg-gradient-to-r from-[#005BFF] to-[#F91155]'
+                                            : 'bg-[#005BFF]'
+                                          : isBestRoi
+                                          ? 'bg-gradient-to-r from-[#CB11AB] to-[#F43F5E]'
+                                          : 'bg-[#CB11AB]'
+                                      }`}
+                                      style={{
+                                        transform: `scaleX(${milestoneProgress})`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Нижний индикатор Home Bar */}
+                    <div className="pt-3 pb-0.5 flex flex-col items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setIsShopMinimized(true)}
+                        title="Свернуть и перевернуть задней крышкой"
+                        className="group py-1 px-6 cursor-pointer flex items-center justify-center"
+                      >
+                        <span className="w-32 h-1.5 rounded-full bg-white/30 group-hover:bg-white/65 transition-colors" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

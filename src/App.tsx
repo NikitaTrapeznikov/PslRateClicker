@@ -20,7 +20,6 @@ import {
 import {
   EvolutionAtlasView,
   GeneticsRebirthView,
-  LeaderboardAndBalanceView,
   RebirthStarryBackground,
 } from './components/ModalsAndPanels';
 import { RankPortraitThumb } from './components/RankPortraitThumb';
@@ -57,7 +56,7 @@ import {
   soundEngine,
 } from './modules/utils';
 
-type ActiveSection = 'arena' | 'evolution' | 'rebirth' | 'leaderboard';
+type ActiveSection = 'arena' | 'evolution' | 'rebirth';
 
 interface MirrorBonusTarget {
   id: number;
@@ -80,7 +79,6 @@ export default function App() {
   const [isProfileLoaded, setIsProfileLoaded] = useState<boolean>(false);
   const [isAtlasLoaded, setIsAtlasLoaded] = useState<boolean>(false);
   const [profile, setProfile] = useState<PlayerProfileData>(() => createDefaultProfile());
-  const [sdkMode, setSdkMode] = useState<'yagames_cloud' | 'local_storage'>('local_storage');
   const [activeSection, setActiveSection] = useState<ActiveSection>('arena');
   const [shopCategory, setShopCategory] = useState<UpgradeCategory>('click');
   const [buyMode, setBuyMode] = useState<BuyMultiplierMode>(1);
@@ -141,10 +139,9 @@ export default function App() {
 
     profileManager
       .initializeAndLoad()
-      .then(({ profile: loaded, offlineReport, sdkMode: mode }) => {
+      .then(({ profile: loaded, offlineReport }) => {
         if (!mounted) return;
         setProfile(loaded);
-        setSdkMode(mode);
         setIsProfileLoaded(true);
         if (offlineReport && offlineReport.looksEarned > 0) {
           setOfflineBanner(offlineReport);
@@ -184,14 +181,13 @@ export default function App() {
     ]
   );
 
-  // Прямая привязка работы плеера к главному экрану (Арена, Эволюция, Поколения, Рейтинг).
-  // На этапе загрузки или вне этих 4 вкладок музыка полностью выключена.
+  // Прямая привязка работы плеера к главному экрану (Арена, Эволюция, Поколения).
+  // На этапе загрузки или вне этих 3 вкладок музыка полностью выключена.
   const isMainScreenWithMusic =
     !isInitialLoading &&
     (activeSection === 'arena' ||
       activeSection === 'evolution' ||
-      activeSection === 'rebirth' ||
-      activeSection === 'leaderboard');
+      activeSection === 'rebirth');
 
   useEffect(() => {
     looksmaxMusic.setMainScreenActive(isMainScreenWithMusic);
@@ -285,10 +281,12 @@ export default function App() {
           auraFrenzyRemainingSec: auraFrenzyRef.current,
         }).currentRank;
 
+        const prevRank = currentStats.currentRank;
         const newHighestRank = Math.max(prev.highestRankIndexReached, newRank.index);
 
-        if (newRank.index > prev.highestRankIndexReached) {
+        if (newRank.index > prevRank.index) {
           soundEngine.playRankUp();
+          rendererRef.current?.triggerMoggedTransition(prevRank, newRank);
           setRankUpBanner({
             rankIndex: newRank.index,
             title: newRank.title,
@@ -419,6 +417,15 @@ export default function App() {
       setMewingCombo((prev) => Math.min(100, prev + 8.5));
 
       setProfile((prev) => {
+        const prevRank = computePlayerStats({
+          currentRunTotalLooks: prev.currentRunTotalLooks,
+          generation: prev.generation,
+          itemLevels: prev.itemLevels,
+          perkLevels: prev.perkLevels,
+          mewingCombo: comboRef.current,
+          rewardedBoostRemainingSec: prev.rewardedBoostRemainingSec,
+        }).currentRank;
+
         const nextRunLooks = prev.currentRunTotalLooks + gain;
         const nextRank = computePlayerStats({
           currentRunTotalLooks: nextRunLooks,
@@ -429,8 +436,9 @@ export default function App() {
           rewardedBoostRemainingSec: prev.rewardedBoostRemainingSec,
         }).currentRank;
 
-        if (nextRank.index > prev.highestRankIndexReached) {
+        if (nextRank.index > prevRank.index) {
           soundEngine.playRankUp();
+          rendererRef.current?.triggerMoggedTransition(prevRank, nextRank);
           setRankUpBanner({
             rankIndex: nextRank.index,
             title: nextRank.title,
@@ -573,35 +581,6 @@ export default function App() {
     });
   }, []);
 
-  // Симуляция оффлайн-времени для проверки 24-часового баланса
-  const handleSimulateOfflineTime = useCallback(
-    (seconds: number) => {
-      const lineageLevel = profile.perkLevels['adams_lineage'] || 0;
-      const offlineEfficiency = Math.min(1.5, 0.45 + lineageLevel * 0.15);
-      const baseRate = Math.max(2, stats.passivePerSecond);
-      const earned = Math.floor(baseRate * seconds * offlineEfficiency);
-
-      soundEngine.playUpgradeBuy();
-      setProfile((prev) => {
-        const updated: PlayerProfileData = {
-          ...prev,
-          looks: prev.looks + earned,
-          currentRunTotalLooks: prev.currentRunTotalLooks + earned,
-          lifetimeTotalLooks: prev.lifetimeTotalLooks + earned,
-          totalPlayTimeSec: prev.totalPlayTimeSec + seconds,
-        };
-        profileManager.saveProfileAsync(updated, false);
-        return updated;
-      });
-
-      setOfflineBanner({
-        elapsedSeconds: seconds,
-        looksEarned: earned,
-      });
-    },
-    [profile.perkLevels, stats.passivePerSecond]
-  );
-
   const filteredShopItems = useMemo(
     () => SHOP_ITEMS.filter((item) => item.category === shopCategory),
     [shopCategory]
@@ -673,7 +652,7 @@ export default function App() {
         Math.floor(stats.passivePerSecond * 18 + stats.clickPower * 14)
       );
 
-      soundEngine.playRankUp();
+      soundEngine.playHammerCrit();
       rendererRef.current?.triggerClickEffect({
         normX: mirrorTarget.normX,
         normY: mirrorTarget.normY,
@@ -688,6 +667,16 @@ export default function App() {
       setAuraFrenzyRemainingSec((prev) => Math.min(30, prev + 12));
 
       setProfile((prev) => {
+        const prevRank = computePlayerStats({
+          currentRunTotalLooks: prev.currentRunTotalLooks,
+          generation: prev.generation,
+          itemLevels: prev.itemLevels,
+          perkLevels: prev.perkLevels,
+          mewingCombo: 100,
+          rewardedBoostRemainingSec: prev.rewardedBoostRemainingSec,
+          auraFrenzyRemainingSec: 12,
+        }).currentRank;
+
         const nextRunLooks = prev.currentRunTotalLooks + instantBonus;
         const nextRank = computePlayerStats({
           currentRunTotalLooks: nextRunLooks,
@@ -699,7 +688,9 @@ export default function App() {
           auraFrenzyRemainingSec: 12,
         }).currentRank;
 
-        if (nextRank.index > prev.highestRankIndexReached) {
+        if (nextRank.index > prevRank.index) {
+          soundEngine.playRankUp();
+          rendererRef.current?.triggerMoggedTransition(prevRank, nextRank);
           setRankUpBanner({
             rankIndex: nextRank.index,
             title: nextRank.title,
@@ -717,11 +708,6 @@ export default function App() {
       });
     },
     [mirrorTarget, stats.passivePerSecond, stats.clickPower]
-  );
-
-  const leaderboardSnapshot = useMemo(
-    () => profileManager.getLeaderboardSnapshot(profile),
-    [profile]
   );
 
   // Пока идет этап загрузки — рендерим ТОЛЬКО экран загрузки, главный экран и плеер выключены
@@ -833,7 +819,7 @@ export default function App() {
           PSL Ascension
         </button>
 
-        {/* Zone 2: 4 навигационные вкладки с высокой контрастностью */}
+        {/* Zone 2: 3 навигационные вкладки с высокой контрастностью */}
         <nav className="hidden md:flex items-center gap-2.5 text-sm font-semibold">
           <button
             type="button"
@@ -868,17 +854,6 @@ export default function App() {
           >
             Поколения и ДНК {stats.canRebirth ? `(+${stats.pendingRebirthDNA})` : ''}
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveSection('leaderboard')}
-            className={`px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
-              activeSection === 'leaderboard'
-                ? 'bg-emerald-500/20 text-white border-emerald-400/60 shadow-[0_0_16px_rgba(16,185,129,0.25)]'
-                : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            Рейтинг и Баланс
-          </button>
         </nav>
 
         {/* Zone 3: 1 основное действие (Rewarded Boost Яндекс Игр) */}
@@ -903,7 +878,7 @@ export default function App() {
       </header>
 
       {/* Мобильная панель переключения разделов */}
-      <div className="relative z-30 md:hidden grid grid-cols-4 gap-1.5 p-2 bg-[#0B1017]/95 backdrop-blur-md border-b border-white/15 shadow-md">
+      <div className="relative z-30 md:hidden grid grid-cols-3 gap-1.5 p-2 bg-[#0B1017]/95 backdrop-blur-md border-b border-white/15 shadow-md">
         <button
           type="button"
           onClick={() => setActiveSection('arena')}
@@ -937,25 +912,14 @@ export default function App() {
         >
           Реборн
         </button>
-        <button
-          type="button"
-          onClick={() => setActiveSection('leaderboard')}
-          className={`py-2 px-2 rounded-lg text-xs font-semibold whitespace-nowrap truncate border ${
-            activeSection === 'leaderboard'
-              ? 'bg-emerald-500/20 text-white border-emerald-400/60'
-              : 'bg-white/5 text-slate-200 border-white/10'
-          }`}
-        >
-          Рейтинг
-        </button>
       </div>
 
-      {/* Уведомление о начисленном оффлайн-доходе или повышении ранга */}
+      {/* Всплывающие уведомления поверх UI (оффлайн-доход после входа и повышение ранга) — не сдвигают верстку */}
       {(offlineBanner || rankUpBanner) && (
-        <div className="max-w-[1400px] w-full mx-auto px-4 sm:px-6 pt-3">
+        <div className="pointer-events-none fixed top-16 md:top-[68px] left-1/2 -translate-x-1/2 z-50 w-full max-w-[720px] px-4 flex flex-col gap-2.5">
           {offlineBanner && (
-            <div className="p-3.5 rounded-xl border border-emerald-500/40 bg-[#182026] flex flex-wrap items-center justify-between gap-4">
-              <div className="text-xs text-[#F1F5F9]">
+            <div className="pointer-events-auto p-3.5 rounded-2xl border border-emerald-400/50 bg-[#111820]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_24px_rgba(16,185,129,0.2)] flex flex-wrap sm:flex-nowrap items-center justify-between gap-4">
+              <div className="text-xs text-[#F1F5F9] leading-relaxed">
                 <span className="font-semibold text-emerald-400">Оффлайн-уход завершен:</span>{' '}
                 за {formatDuration(offlineBanner.elapsedSeconds)} работы мазей и восстановления вы
                 получили{' '}
@@ -967,7 +931,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setOfflineBanner(null)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-colors whitespace-nowrap shrink-0"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-colors whitespace-nowrap shrink-0 cursor-pointer shadow-sm"
               >
                 Забрать очки
               </button>
@@ -975,7 +939,7 @@ export default function App() {
           )}
 
           {rankUpBanner && (
-            <div className="mt-2 p-3.5 rounded-xl border border-amber-500/50 bg-[#182026] flex flex-wrap items-center justify-between gap-4">
+            <div className="pointer-events-auto p-3.5 rounded-2xl border border-amber-400/60 bg-[#111820]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_24px_rgba(245,158,11,0.22)] flex flex-wrap sm:flex-nowrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <RankPortraitThumb
                   atlasImage={atlasImage}
@@ -992,7 +956,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setRankUpBanner(null)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors whitespace-nowrap shrink-0"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors whitespace-nowrap shrink-0 cursor-pointer shadow-sm"
               >
                 Продолжить
               </button>
@@ -1306,25 +1270,6 @@ export default function App() {
             atlasImage={atlasImage}
             onTriggerRebirth={handleTriggerRebirth}
             onBuyPerk={handleBuyDnaPerk}
-          />
-        )}
-
-        {activeSection === 'leaderboard' && (
-          <LeaderboardAndBalanceView
-            profile={profile}
-            stats={stats}
-            leaderboard={leaderboardSnapshot}
-            sdkMode={sdkMode}
-            onForceCloudSave={() => {
-              profileManager.saveProfileAsync(profile, true);
-              soundEngine.playUpgradeBuy();
-            }}
-            onSimulateOfflineTime={handleSimulateOfflineTime}
-            onResetProgress={() => {
-              const fresh = profileManager.resetAllProgress();
-              setProfile(fresh);
-              setMewingCombo(0);
-            }}
           />
         )}
       </main>

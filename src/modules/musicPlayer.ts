@@ -182,8 +182,8 @@ class DualDeckCrossfadeController {
   private isLoading = false;
   private isCrossfading = false;
 
-  // Стартовая громкость ровно 10% (0.1) по запросу пользователя
-  private masterVolume = 0.1;
+  // Стартовая громкость ровно 5% (0.05) по запросу пользователя
+  private masterVolume = 0.05;
   private deckAVolumeFactor = 1.0;
   private deckBVolumeFactor = 0.0;
 

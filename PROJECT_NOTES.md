@@ -6,18 +6,22 @@
 
 ## 1. Карта файлов и компонентов (куда сразу идти при правках)
 
-### Главный контроллер и Арена (`src/App.tsx` — ~1320 строк)
-- Управляет состоянием профиля (`profile`), 4 основными вкладками (`activeSection`: `'arena' | 'evolution' | 'rebirth' | 'leaderboard'`), комбо мьюинга (`mewingCombo`), импульсом ауры (`auraFrenzyRemainingSec`) и бонус-мишенями на стекле зеркала (`mirrorTarget`).
-- Содержит верхнюю панель навигации (`<header className="relative z-30 ...">`), баннеры оффлайн-дохода/повышения ранга и центральную колонку **Умного Зеркала (Smart Mirror)** с HTML5 Canvas (`PSLSpriteRenderer`).
+### Главный контроллер и Арена (`src/App.tsx` — ~1380 строк)
+- Управляет состоянием профиля (`profile`), 3 основными вкладками (`activeSection`: `'arena' | 'evolution' | 'rebirth'`), комбо мьюинга (`mewingCombo`), импульсом ауры (`auraFrenzyRemainingSec`), переходом `MOGGED` при повышении ранга и бонус-мишенями на стекле зеркала (`mirrorTarget`).
+- Содержит верхнюю панель навигации (`<header className="relative z-30 ...">`), плавающие поверх UI баннеры оффлайн-дохода/повышения ранга и центральную колонку **Умного Зеркала (Smart Mirror)** с HTML5 Canvas (`PSLSpriteRenderer`).
 - Изолирует фоны по вкладкам:
   - `{activeSection === 'arena' && <ArenaStageBackground ... />}` + неоновая виньетка «Поток Сигмы».
   - `{activeSection === 'rebirth' && <RebirthStarryBackground />}` — звёздное небо с парящими фото Адамов.
 
 ### Отдельные компоненты экранов и виджетов (`src/components/`)
-1. **`src/components/MarketplacePhoneShop.tsx` (~490 строк)** — Правая колонка Арены:
+1. **`src/components/MarketplacePhoneShop.tsx` (~1070 строк)** — Правая колонка Арены:
    - 3D-смартфон **Cosmic Orange 17 Pro** с разворотом на `180deg` (`isShopMinimized`).
-   - Лицевая сторона: экран маркетплейса с переключением витрин **«О-ЗОНА · Клик»** (`#005BFF` / `#F91155`) и **«ЯГОДКИ · Уход»** (`#CB11AB` / `#F472B6`), режимами `×1 / ×10 / MAX`, подсветкой лучшего ROI (`bestRoiItemId`) и шкалой до рубежа `×2`.
+   - Лицевая сторона: верхняя док-панель переключения 3 отдельных приложений: **«О-ЗОНА»** (`#005BFF` / `#F91155`), **«ЯГОДКИ»** (`#CB11AB` / `#F472B6`) и **«ТелеГрамм»** (`#2AABEE` / `#17212B`), всплывающие пуш-уведомления от девушек под Dynamic Island.
    - Задняя крышка: полноширинное плато из 3 объективов Pro + True Tone Flash + LiDAR, кольцо MagSafe и MagSafe Wallet быстрого заказа.
+1a. **`src/components/PhoneMessengerApp.tsx` (~700 строк)** — Приложение-мессенджер «ТелеГрамм» внутри смартфона:
+   - Главная панель чатов в точном стиле Telegram Night Mode без перехода внутрь переписок.
+   - 22 профиля девушек (`GIRL_CONTACTS`), которые постепенно разблокируются с ростом ранга PSL (`Sub 3` → `True Adam`).
+   - 50 негативных фраз (`NEGATIVE_GIRL_PHRASES`) для низких уровней (`Sub 3`, `Sub 5`, `LTN`) и 50 восторженных фраз (`ADMIRING_GIRL_PHRASES`) для высоких уровней (`MTN` .. `True Adam`).
 2. **`src/components/EvolutionAtlasView.tsx` (~250 строк)** — Вкладка **«Эволюция PSL (8 стадий)»**:
    - Компактная верхняя панель с текущим/выбранным портретом, точками быстрого выбора стадий `#1..#8`, прогрессом до следующей стадии и кнопкой `Смотреть бой Олимпа / Показать карточки` (`watchBattleMode`).
    - Сетка из 8 полупрозрачных карточек рангов (`Sub 3` .. `True Adam`) с портретами `RankPortraitThumb`.
@@ -28,10 +32,8 @@
    - Экспортирует `RebirthStarryBackground` (яркий космос `/assets/adams/nebula_1.jpg` + 6 парящих фото Адамов без затухания) и `GeneticsRebirthView`.
    - Верхний компактный баннер Смены Поколения с 3D-спиралью ДНК (`/assets/perks/dna_helix.gif`), прогрессом до `Chadlite` (`15 000 000 PSL`), кнопкой `⚡ ПЕРЕРОДИТЬСЯ` и полноэкранной вспышкой вознесения (`rebirthFlash`).
    - Сетка из 5 GIF-карточек мутаций ДНК (`DNA_PERKS`) с золотой эволюцией `animate-gold-gene` (`★ АБСОЛЮТ ✓`) при достижении максимального уровня.
-5. **`src/components/LeaderboardAndBalanceView.tsx` (~190 строк)** — Вкладка **«Рейтинг и Баланс»**:
-   - Таблица лидеров Яндекс Игр (`leaderboard`), синхронизация с облаком, статистика профиля (`sdkMode`), кнопки тестирования оффлайн-баланса (`+30 мин`, `+2 часа`, `+8ч (Сон)`) и двухшаговый сброс прогресса.
-6. **`src/components/ModalsAndPanels.tsx` (~20 строк)** — Компактный фасад реэкспорта `EvolutionAtlasView`, `GeneticsRebirthView`, `RebirthStarryBackground`, `LeaderboardAndBalanceView`, `OlympusTitansBattleBackdrop`.
-7. **`src/components/LooksmaxMusicPlayer.tsx` (~350 строк)** — Левая колонка Арены:
+5. **`src/components/ModalsAndPanels.tsx` (~16 строк)** — Компактный фасад реэкспорта `EvolutionAtlasView`, `GeneticsRebirthView`, `RebirthStarryBackground`, `OlympusTitansBattleBackdrop`.
+6. **`src/components/LooksmaxMusicPlayer.tsx` (~350 строк)** — Левая колонка Арены:
    - В свёрнутом виде (`isMinimized = true`): карточка `320×420` с мгновенным переключением 5 предзагруженных GIF танцоров по клику и мини-пульт поверх.
    - В развёрнутом виде: полный список из 16 MP3-треков, режимы `0.85x Slowed`, `Повтор 1 / Подряд`, кроссфейд 4с.
 8. **`src/components/LooksmaxLoadingScreen.tsx` (~420 строк)** — Экран загрузки с мем-слайдером, чеклистом модулей и кнопкой `SKIP · ПРОПУСТИТЬ`.

@@ -75,6 +75,19 @@ class SoundController {
   private ctx: AudioContext | null = null;
   private userMuted: boolean = false;
   private systemPaused: boolean = false; // При сворачивании вкладки или показе рекламы YaGames
+  private mogAudio: HTMLAudioElement | null = null;
+  private mogMediaSourceConnected = false;
+
+  private getMogAudio(): HTMLAudioElement | null {
+    if (typeof window === 'undefined') return null;
+    if (!this.mogAudio) {
+      const audio = new Audio('/assets/sfx/mog_sound_effect.mp3');
+      audio.preload = 'auto';
+      audio.volume = 1.0;
+      this.mogAudio = audio;
+    }
+    return this.mogAudio;
+  }
 
   private getContext(): AudioContext | null {
     if (this.userMuted || this.systemPaused) return null;
@@ -94,8 +107,13 @@ class SoundController {
 
   public setUserMuted(muted: boolean): void {
     this.userMuted = muted;
-    if (muted && this.ctx && this.ctx.state === 'running') {
-      this.ctx.suspend().catch(() => {});
+    if (muted) {
+      if (this.ctx && this.ctx.state === 'running') {
+        this.ctx.suspend().catch(() => {});
+      }
+      if (this.mogAudio && !this.mogAudio.paused) {
+        this.mogAudio.pause();
+      }
     }
   }
 
@@ -106,6 +124,9 @@ class SoundController {
   public setSystemPaused(paused: boolean): void {
     this.systemPaused = paused;
     looksmaxMusic.setSystemPaused(paused);
+    if (paused && this.mogAudio && !this.mogAudio.paused) {
+      this.mogAudio.pause();
+    }
     if (this.ctx) {
       if (paused && this.ctx.state === 'running') {
         this.ctx.suspend().catch(() => {});
@@ -212,32 +233,32 @@ class SoundController {
   }
 
   /**
-   * Фанфара повышения ранга внешности (Sub 3 -> Sub 5 -> ... -> True Adam).
+   * Громкий фирменный звук «Mog Sound Effect» при переходе на новый уровень внешности на арене.
    */
   public playRankUp(): void {
+    if (this.userMuted || this.systemPaused) return;
+
     const ctx = this.getContext();
-    if (!ctx) return;
 
     try {
-      const now = ctx.currentTime;
-      const notes = [392.0, 493.88, 587.33, 783.99]; // G4, B4, D5, G5
-      notes.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const start = now + idx * 0.065;
-
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, start);
-
-        gain.gain.setValueAtTime(0.14, start);
-        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(start);
-        osc.stop(start + 0.26);
-      });
+      const mog = this.getMogAudio();
+      if (mog) {
+        if (ctx && !this.mogMediaSourceConnected) {
+          try {
+            const source = ctx.createMediaElementSource(mog);
+            const boostGain = ctx.createGain();
+            boostGain.gain.value = 1.85;
+            source.connect(boostGain);
+            boostGain.connect(ctx.destination);
+            this.mogMediaSourceConnected = true;
+          } catch {
+            // Если MediaElementSource уже подключен, оставляем штатный выход
+          }
+        }
+        mog.currentTime = 0;
+        mog.volume = 1.0;
+        mog.play().catch(() => {});
+      }
     } catch {
       // Ignore
     }

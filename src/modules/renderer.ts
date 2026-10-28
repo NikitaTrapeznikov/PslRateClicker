@@ -172,6 +172,17 @@ export class PSLSpriteRenderer {
   private atlasImage: HTMLImageElement | null = null;
   private isLoaded = false;
   private hasError = false;
+  private moggedBarImage: HTMLImageElement | null = null;
+  private isMoggedBarLoaded = false;
+
+  // Переход между уровнями: старый персонаж с плашкой MOGGED на глазах -> исчезновение -> новый персонаж
+  private lastRenderedRank: PSLRankDefinition | null = null;
+  private moggedTransition: {
+    oldRank: PSLRankDefinition;
+    newRank: PSLRankDefinition;
+    startTimeMs: number;
+    durationMs: number;
+  } | null = null;
 
   // Анимационные состояния сцены
   private scalePulse = 1.0;
@@ -193,6 +204,13 @@ export class PSLSpriteRenderer {
 
   constructor(onAtlasReady?: () => void) {
     if (typeof window !== 'undefined') {
+      const mogImg = new Image();
+      mogImg.src = '/assets/sfx/mogged_eye_bar.svg';
+      mogImg.onload = () => {
+        this.moggedBarImage = mogImg;
+        this.isMoggedBarLoaded = true;
+      };
+
       const img = new Image();
       img.src = PSL_ATLAS_HD_URL;
       img.onload = () => {
@@ -223,6 +241,26 @@ export class PSLSpriteRenderer {
 
   public getAtlasImage(): HTMLImageElement | null {
     return this.atlasImage;
+  }
+
+  /**
+   * Запускает сцену «MOGGED» при достижении нового уровня внешности:
+   * На глаза старого персонажа падает черная плашка MOGGED, держится ~1.7с,
+   * после чего плавно исчезает и появляется следующий персонаж.
+   */
+  public triggerMoggedTransition(
+    oldRank: PSLRankDefinition,
+    newRank: PSLRankDefinition
+  ): void {
+    this.moggedTransition = {
+      oldRank,
+      newRank,
+      startTimeMs: performance.now(),
+      durationMs: 2150,
+    };
+    this.shakeOffsetX = (Math.random() - 0.5) * 18;
+    this.shakeOffsetY = (Math.random() - 0.5) * 18;
+    this.scalePulse = 0.94;
   }
 
   /**
@@ -297,6 +335,133 @@ export class PSLSpriteRenderer {
     });
   }
 
+  private drawSingleRankPortrait(
+    ctx: CanvasRenderingContext2D,
+    targetRank: PSLRankDefinition,
+    targetBoxSize: number,
+    showOriginalCaption: boolean
+  ): { drawW: number; drawH: number } {
+    if (this.isLoaded && this.atlasImage) {
+      const uv = showOriginalCaption ? targetRank.cropWithLabelUV : targetRank.cropUV;
+      const sx = uv.x * this.atlasImage.naturalWidth;
+      const sy = uv.y * this.atlasImage.naturalHeight;
+      const sw = uv.w * this.atlasImage.naturalWidth;
+      const sh = uv.h * this.atlasImage.naturalHeight;
+
+      const aspect = sw / sh;
+      let drawW = targetBoxSize;
+      let drawH = targetBoxSize / aspect;
+      if (drawH > targetBoxSize) {
+        drawH = targetBoxSize;
+        drawW = targetBoxSize * aspect;
+      }
+
+      ctx.drawImage(
+        this.atlasImage,
+        sx,
+        sy,
+        sw,
+        sh,
+        -drawW / 2,
+        -drawH / 2,
+        drawW,
+        drawH
+      );
+      return { drawW, drawH };
+    }
+
+    this.drawFallbackSilhouette(ctx, targetBoxSize, targetRank);
+    return { drawW: targetBoxSize, drawH: targetBoxSize };
+  }
+
+  private drawMoggedEyeBarOverlay(
+    ctx: CanvasRenderingContext2D,
+    oldRank: PSLRankDefinition,
+    drawW: number,
+    drawH: number,
+    showOriginalCaption: boolean,
+    elapsedMs: number,
+    alpha: number
+  ): void {
+    // Точная калибровка координат глаз для каждого из 8 персонажей относительно их cropUV
+    const EYE_CALIBRATION: Array<{
+      ex: number;
+      ey: number;
+      bw: number;
+      bh: number;
+    }> = [
+      // 0: Sub 3
+      { ex: 0.012, ey: 0.014, bw: 0.54, bh: 0.105 },
+      // 1: Sub 5
+      { ex: 0.022, ey: 0.030, bw: 0.50, bh: 0.105 },
+      // 2: LTN
+      { ex: 0.005, ey: 0.028, bw: 0.50, bh: 0.105 },
+      // 3: MTN
+      { ex: -0.015, ey: 0.010, bw: 0.50, bh: 0.10 },
+      // 4: HTN
+      { ex: 0.005, ey: -0.015, bw: 0.50, bh: 0.10 },
+      // 5: Chadlite
+      { ex: 0.018, ey: -0.020, bw: 0.50, bh: 0.10 },
+      // 6: Chad
+      { ex: 0.004, ey: -0.022, bw: 0.48, bh: 0.10 },
+      // 7: True Adam
+      { ex: 0.005, ey: -0.025, bw: 0.44, bh: 0.10 },
+    ];
+
+    const cal = EYE_CALIBRATION[oldRank.index] || EYE_CALIBRATION[0];
+    const baseUV = oldRank.cropUV;
+    const activeUV = showOriginalCaption ? oldRank.cropWithLabelUV : oldRank.cropUV;
+
+    // Абсолютная точка центра глаз и размер плашки в UV-пространстве всего атласа
+    const eyeAtlasU = baseUV.x + baseUV.w * (0.5 + cal.ex);
+    const eyeAtlasV = baseUV.y + baseUV.h * (0.5 + cal.ey);
+    const barAtlasW = baseUV.w * cal.bw;
+    const barAtlasH = baseUV.h * cal.bh;
+
+    // Перевод из UV атласа в локальные пиксели отрисованного портрета (-drawW/2 .. +drawW/2)
+    const eyeX = ((eyeAtlasU - (activeUV.x + activeUV.w * 0.5)) / activeUV.w) * drawW;
+    const eyeY = ((eyeAtlasV - (activeUV.y + activeUV.h * 0.5)) / activeUV.h) * drawH;
+    const barW = (barAtlasW / activeUV.w) * drawW;
+    const barH = (barAtlasH / activeUV.h) * drawH;
+
+    // Эффект мощного штампа на глаза в первые 150мс
+    const slamProgress = Math.min(1, elapsedMs / 150);
+    const easeOutBack = 1 - Math.pow(1 - slamProgress, 3);
+    const barScale = 1.85 - 0.85 * easeOutBack;
+    const tiltRad = -0.018 + (1 - slamProgress) * 0.06;
+
+    ctx.save();
+    ctx.translate(eyeX, eyeY);
+    ctx.rotate(tiltRad);
+    ctx.scale(barScale, barScale);
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.78)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+
+    if (this.isMoggedBarLoaded && this.moggedBarImage) {
+      ctx.drawImage(this.moggedBarImage, -barW / 2, -barH / 2, barW, barH);
+    } else {
+      // Мгновенный векторный фоллбэк, если SVG еще декодируется
+      ctx.fillStyle = '#070709';
+      ctx.strokeStyle = '#EF4444';
+      ctx.lineWidth = 2.5;
+      ctx.fillRect(-barW / 2, -barH / 2, barW, barH);
+      ctx.strokeRect(-barW / 2, -barH / 2, barW, barH);
+
+      const fontSize = Math.max(14, Math.round(barH * 0.62));
+      ctx.font = `900 ${fontSize}px Impact, "Arial Black", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#DC2626';
+      ctx.fillText('MOGGED', 2, 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText('MOGGED', 0, 0);
+    }
+
+    ctx.restore();
+  }
+
   /**
    * Основной метод отрисовки кадра (60 FPS) на HTML5 Canvas.
    */
@@ -317,10 +482,18 @@ export class PSLSpriteRenderer {
       rank,
       showOriginalCaption,
       mewingCombo,
-      generation,
-      perkLevels,
-      rewardedBoostActive,
     } = options;
+
+    // Автоматический перехват повышения уровня для показа плашки MOGGED на старом персонаже
+    if (this.lastRenderedRank && rank.index > this.lastRenderedRank.index) {
+      if (
+        !this.moggedTransition ||
+        this.moggedTransition.newRank.index !== rank.index
+      ) {
+        this.triggerMoggedTransition(this.lastRenderedRank, rank);
+      }
+    }
+    this.lastRenderedRank = rank;
 
     const animProfile =
       STAGE_ANIMATION_PROFILES[rank.index] || STAGE_ANIMATION_PROFILES[0];
@@ -356,45 +529,87 @@ export class PSLSpriteRenderer {
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Отрисовка HD-портрета с упругим откликом при нажатии и шейком при крите (без квадратных полос и сеток)
+    // 2. Отрисовка HD-портрета (или сцены перехода MOGGED со старым персонажем и плашкой на глазах)
     const centerX = width / 2 + this.shakeOffsetX;
     const centerY = height / 2 + this.shakeOffsetY;
+    const targetBoxSize = Math.min(width, height) * 0.84;
 
     ctx.save();
     ctx.translate(centerX, centerY);
     ctx.scale(this.scalePulse, this.scalePulse);
 
-    const targetBoxSize = Math.min(width, height) * 0.84;
+    if (this.moggedTransition) {
+      const now = performance.now();
+      const elapsed = now - this.moggedTransition.startTimeMs;
+      const total = this.moggedTransition.durationMs;
 
-    if (this.isLoaded && this.atlasImage) {
-      const uv = showOriginalCaption ? rank.cropWithLabelUV : rank.cropUV;
-      const sx = uv.x * this.atlasImage.naturalWidth;
-      const sy = uv.y * this.atlasImage.naturalHeight;
-      const sw = uv.w * this.atlasImage.naturalWidth;
-      const sh = uv.h * this.atlasImage.naturalHeight;
+      if (elapsed >= total) {
+        this.moggedTransition = null;
+        this.drawSingleRankPortrait(ctx, rank, targetBoxSize, showOriginalCaption);
+      } else {
+        // Первые 76% времени (~1.65с): держим старого персонажа с плашкой MOGGED на глазах
+        // Последние 24% времени (~0.5с): старый персонаж и плашка исчезают, появляется новый персонаж
+        const holdEndMs = total * 0.76;
 
-      const aspect = sw / sh;
-      let drawW = targetBoxSize;
-      let drawH = targetBoxSize / aspect;
-      if (drawH > targetBoxSize) {
-        drawH = targetBoxSize;
-        drawW = targetBoxSize * aspect;
+        if (elapsed <= holdEndMs) {
+          const { drawW, drawH } = this.drawSingleRankPortrait(
+            ctx,
+            this.moggedTransition.oldRank,
+            targetBoxSize,
+            showOriginalCaption
+          );
+          this.drawMoggedEyeBarOverlay(
+            ctx,
+            this.moggedTransition.oldRank,
+            drawW,
+            drawH,
+            showOriginalCaption,
+            elapsed,
+            1.0
+          );
+        } else {
+          const fadeT = Math.min(1, (elapsed - holdEndMs) / (total - holdEndMs));
+          const oldAlpha = 1 - fadeT;
+          const newAlpha = fadeT;
+
+          // Старый персонаж + плашка MOGGED растворяются
+          ctx.save();
+          ctx.globalAlpha = oldAlpha;
+          const oldScale = 1 - fadeT * 0.06;
+          ctx.scale(oldScale, oldScale);
+          const { drawW, drawH } = this.drawSingleRankPortrait(
+            ctx,
+            this.moggedTransition.oldRank,
+            targetBoxSize,
+            showOriginalCaption
+          );
+          this.drawMoggedEyeBarOverlay(
+            ctx,
+            this.moggedTransition.oldRank,
+            drawW,
+            drawH,
+            showOriginalCaption,
+            elapsed,
+            oldAlpha
+          );
+          ctx.restore();
+
+          // Новый персонаж проявляется на его месте
+          ctx.save();
+          ctx.globalAlpha = newAlpha;
+          const newScale = 1.07 - fadeT * 0.07;
+          ctx.scale(newScale, newScale);
+          this.drawSingleRankPortrait(
+            ctx,
+            this.moggedTransition.newRank,
+            targetBoxSize,
+            showOriginalCaption
+          );
+          ctx.restore();
+        }
       }
-
-      ctx.drawImage(
-        this.atlasImage,
-        sx,
-        sy,
-        sw,
-        sh,
-        -drawW / 2,
-        -drawH / 2,
-        drawW,
-        drawH
-      );
     } else {
-      // Фоллбэк-силуэт на время загрузки текстуры
-      this.drawFallbackSilhouette(ctx, targetBoxSize, rank);
+      this.drawSingleRankPortrait(ctx, rank, targetBoxSize, showOriginalCaption);
     }
 
     ctx.restore();
